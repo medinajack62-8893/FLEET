@@ -1,0 +1,3794 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ניהול צי מנופים וצמ"ה</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f7f4; color: #1c1917; direction: rtl; }
+    :root {
+      --primary: #ea580c;
+      --primary-light: #fed7aa;
+      --primary-dark: #c2410c;
+      --bg: #f8f7f4;
+      --sidebar-w: 256px;
+      --white: #ffffff;
+      --border: #e7e5e4;
+      --text: #1c1917;
+      --text-muted: #78716c;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+    }
+
+    /* Layout */
+    #sidebar {
+      position: fixed; top: 0; right: 0; width: var(--sidebar-w);
+      height: 100vh; background: var(--white); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; z-index: 100; overflow-y: auto;
+    }
+    #main { margin-right: var(--sidebar-w); min-height: 100vh; padding: 24px; }
+
+    /* Sidebar */
+    .sidebar-logo {
+      padding: 20px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), #d97706);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: white; flex-shrink: 0;
+    }
+    .logo-text h1 { font-size: 16px; font-weight: 700; color: var(--text); }
+    .logo-text p { font-size: 11px; color: var(--text-muted); }
+    .nav-list { list-style: none; padding: 12px 8px; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 10px; cursor: pointer;
+      color: var(--text-muted); font-size: 14px; font-weight: 500;
+      transition: all 0.15s; margin-bottom: 2px;
+    }
+    .nav-item:hover { background: #f5f5f4; color: var(--text); }
+    .nav-item.active {
+      background: linear-gradient(135deg, var(--primary), #d97706);
+      color: white;
+    }
+    .nav-item span.icon { font-size: 18px; width: 22px; text-align: center; }
+
+    /* Cards & Stats */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--white); border-radius: 14px; padding: 20px;
+      border: 1px solid var(--border); display: flex; align-items: center; gap: 14px;
+    }
+    .stat-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
+    }
+    .stat-info h3 { font-size: 26px; font-weight: 700; color: var(--text); }
+    .stat-info p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Page header */
+    .page-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .page-header h2 { font-size: 22px; font-weight: 700; }
+    .page-header p { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: #f5f5f4; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* Table */
+    .table-card { background: var(--white); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+    .table-scroll { overflow-x: auto; overflow-y: auto; max-height: 72vh; }
+    .table-scroll table { min-width: 750px; }
+    .table-scroll thead th { position: sticky; top: 0; background: var(--white); z-index: 1; box-shadow: 0 1px 0 var(--border); }
+    .table-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .table-header h3 { font-size: 15px; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #fafaf9; padding: 10px 14px; text-align: right; font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 12px 14px; font-size: 13px; border-bottom: 1px solid #f5f5f4; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafaf9; }
+
+    /* Badge */
+    .badge {
+      display: inline-flex; align-items: center; padding: 3px 8px;
+      border-radius: 20px; font-size: 11px; font-weight: 600;
+    }
+    .badge-green { background: #dcfce7; color: #16a34a; }
+    .badge-red { background: #fee2e2; color: var(--danger); }
+    .badge-yellow { background: #fef9c3; color: #854d0e; }
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-gray { background: #f5f5f4; color: var(--text-muted); }
+    .badge-orange { background: #ffedd5; color: var(--primary); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center; z-index: 500;
+    }
+    .modal {
+      background: var(--white); border-radius: 16px; width: 90%; max-width: 620px;
+      max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+    .modal-header {
+      padding: 18px 20px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--white);
+    }
+    .modal-header h3 { font-size: 17px; font-weight: 700; }
+    .modal-body { padding: 20px; }
+    .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+    .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
+    .close-btn:hover { color: var(--text); }
+
+    /* Form */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .form-group input, .form-group select, .form-group textarea {
+      border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;
+      font-size: 13px; color: var(--text); background: var(--white);
+      transition: border 0.15s; outline: none; direction: rtl;
+      font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: var(--primary);
+    }
+    .form-group textarea { resize: vertical; min-height: 72px; }
+    .form-section-title { font-size: 13px; font-weight: 700; color: var(--text-muted); margin: 8px 0 4px; grid-column: 1/-1; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+
+    /* Search */
+    .search-box { display: flex; gap: 8px; margin-bottom: 16px; }
+    .search-input {
+      flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+      font-size: 13px; outline: none; direction: rtl;
+    }
+    .search-input:focus { border-color: var(--primary); }
+
+    /* Alert */
+    .alert { padding: 12px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+    .alert-success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .alert-error { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+    .empty-state .empty-icon { font-size: 42px; margin-bottom: 10px; }
+    .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 6px; }
+    .empty-state p { font-size: 13px; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; margin-left: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text-muted); transition: all 0.15s; }
+    .tab.active { border-bottom-color: var(--primary); color: var(--primary); }
+    .tab:hover:not(.active) { color: var(--text); }
+
+    /* Filter bar */
+    .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .filter-btn { padding: 5px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid var(--border); background: var(--white); color: var(--text-muted); transition: all 0.15s; }
+    .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    /* Actions menu in table */
+    .action-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 6px; color: var(--text-muted); }
+    .action-btn:hover { background: #f5f5f4; color: var(--text); }
+    .action-btn.del:hover { background: #fee2e2; color: var(--danger); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      #sidebar { display: none; }
+      #main { margin-right: 0; padding: 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* Tasks */
+    .task-card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s; }
+    .task-card:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(234,88,12,0.08); }
+    .task-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .task-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .task-card p { font-size: 12px; color: var(--text-muted); }
+    .task-card-meta { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+// ── Supabase connection ──────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://ustnvbxuuiwioyxnllgf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzdG52Ynh1dWl3aW95eG5sbGdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MTk1MzgsImV4cCI6MjA5MzI5NTUzOH0.VBYX2JTWe69u1uBrNiNif1IEKMkKfax6gRB1Zl3uC6o';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(v) { return v || '—'; }
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('he-IL') : '—'; }
+
+const STATUS_LABELS = {
+  equipment: { active: 'פעיל', inactive: 'לא פעיל', maintenance: 'בתחזוקה' },
+  employee:  { active: 'פעיל', inactive: 'לא פעיל', vacation: 'חופשה', sick: 'מחלה' },
+  order:     { pending: 'ממתין', approved: 'אושר', active: 'בביצוע', completed: 'הושלם', cancelled: 'בוטל' },
+  task:      { open: 'פתוח', in_progress: 'בביצוע', done: 'הושלם', cancelled: 'בוטל' },
+};
+
+const STATUS_BADGE = {
+  active: 'badge-green', inactive: 'badge-red', maintenance: 'badge-yellow',
+  vacation: 'badge-yellow', sick: 'badge-red',
+  pending: 'badge-yellow', approved: 'badge-blue', in_progress: 'badge-blue',
+  completed: 'badge-green', cancelled: 'badge-gray', done: 'badge-green', open: 'badge-orange',
+};
+
+function Badge({ val, type }) {
+  const label = STATUS_LABELS[type]?.[val] || val || '—';
+  const cls = STATUS_BADGE[val] || 'badge-gray';
+  return <span className={`badge ${cls}`}>{label}</span>;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function useToast() {
+  const [toast, setToast] = useState(null);
+  const show = (msg, type='success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+  return { toast, show };
+}
+function Toast({ toast }) {
+  if (!toast) return null;
+  return (
+    <div style={{
+      position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
+      background: toast.type==='error' ? '#dc2626' : '#16a34a',
+      color:'white', padding:'10px 20px', borderRadius:10, fontSize:14,
+      boxShadow:'0 4px 20px rgba(0,0,0,0.15)', zIndex:9999, whiteSpace:'nowrap'
+    }}>{toast.msg}</div>
+  );
+}
+
+// ── Confirm delete dialog ─────────────────────────────────────────────────────
+function ConfirmDialog({ msg, onYes, onNo }) {
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{maxWidth:360}}>
+        <div className="modal-body" style={{textAlign:'center', padding:'30px 20px'}}>
+          <div style={{fontSize:36, marginBottom:10}}>⚠️</div>
+          <p style={{fontSize:15, marginBottom:20}}>{msg}</p>
+          <div style={{display:'flex', gap:10, justifyContent:'center'}}>
+            <button className="btn btn-outline" onClick={onNo}>ביטול</button>
+            <button className="btn btn-danger" onClick={onYes}>מחק</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HOME PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+function HomePage({ navigate }) {
+  const [counts, setCounts] = useState({ equipment:0, employees:0, orders:0, tasks:0, active_eq:0, active_emp:0 });
+  const [loading, setLoading] = useState(true);
+  const [recentOrders, setRecentOrders] = useState([]);
+
+  useEffect(() => {
+    async function load() {
+      const [eq, emp, ord, tsk] = await Promise.all([
+        supabase.from('equipment').select('id,equipment_status'),
+        supabase.from('employees').select('id,employee_status'),
+        supabase.from('orders').select('id,order_number,project_name,client_name,start_date,status').order('created_at',{ascending:false}).limit(5),
+        supabase.from('tasks').select('id'),
+      ]);
+      setCounts({
+        equipment: eq.data?.length||0,
+        employees: emp.data?.length||0,
+        orders: ord.data?.length||0,
+        tasks: tsk.data?.length||0,
+        active_eq: eq.data?.filter(e=>e.equipment_status==='active').length||0,
+        active_emp: emp.data?.filter(e=>e.employee_status==='active').length||0,
+      });
+      setRecentOrders(ord.data||[]);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const stats = [
+    { label: 'כלים וציוד', value: counts.equipment, sub: `${counts.active_eq} פעילים`, icon: '🏗️', bg:'#ffedd5', page:'equipment' },
+    { label: 'עובדים', value: counts.employees, sub: `${counts.active_emp} פעילים`, icon: '👷', bg:'#dbeafe', page:'employees' },
+    { label: 'הזמנות', value: counts.orders, sub: 'סה"כ הזמנות', icon: '📋', bg:'#dcfce7', page:'orders' },
+    { label: 'משימות', value: counts.tasks, sub: 'סה"כ משימות', icon: '✅', bg:'#fef9c3', page:'tasks' },
+  ];
+
+  if (loading) return <div className="loading"><div className="spinner"></div> טוען נתונים...</div>;
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h2>דף הבית</h2>
+          <p>סיכום מצב הצי ופעילות שוטפת</p>
+        </div>
+      </div>
+
+      <div className="stat-grid">
+        {stats.map(s => (
+          <div key={s.label} className="stat-card" style={{cursor:'pointer'}} onClick={()=>navigate(s.page)}>
+            <div className="stat-icon" style={{background:s.bg}}>{s.icon}</div>
+            <div className="stat-info">
+              <h3>{s.value}</h3>
+              <p style={{fontWeight:600, fontSize:13, color:'#1c1917'}}>{s.label}</p>
+              <p>{s.sub}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="table-card">
+        <div className="table-header">
+          <h3>הזמנות אחרונות</h3>
+          <button className="btn btn-outline btn-sm" onClick={()=>navigate('orders')}>כל ההזמנות</button>
+        </div>
+        {recentOrders.length === 0 ? (
+          <div className="empty-state"><p>אין הזמנות עדיין</p></div>
+        ) : (
+          <table>
+            <thead><tr>
+              <th>מס׳ הזמנה</th><th>פרויקט</th><th>לקוח</th><th>תאריך התחלה</th><th>סטטוס</th>
+            </tr></thead>
+            <tbody>
+              {recentOrders.map(o => (
+                <tr key={o.id}>
+                  <td><strong>{fmt(o.order_number)}</strong></td>
+                  <td>{fmt(o.project_name)}</td>
+                  <td>{fmt(o.client_name)}</td>
+                  <td>{fmtDate(o.start_date)}</td>
+                  <td><Badge val={o.status} type="order" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EQUIPMENT PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+const EQ_STATUS_OPTIONS = [
+  {value:'active', label:'פעיל'},
+  {value:'inactive', label:'לא פעיל'},
+  {value:'maintenance', label:'בתחזוקה'},
+];
+
+
+function EquipmentModal({ item, equipmentTypes, onClose, onSave }) {
+  const blank = {
+    name:'', equipment_number:'', mia_number:'', license_number:'',
+    chassis_number:'', manufacture_year:'', manufacturer:'', model:'',
+    dedicated_type:'', crane_size:'',
+    license_date:'', inspector_date:'', transport_license_date:'',
+    equipment_status:'active', bonus_percentage:'', activity_section:'', operator_section:'',
+    notes:'',
+  };
+  const [form, setForm] = useState(item ? {...blank,...item} : blank);
+  const [saving, setSaving] = useState(false);
+  const set = (k,v) => setForm(f => ({...f,[k]:v}));
+
+  async function handleSave() {
+    if (!form.name.trim()) { alert('שם הכלי הוא שדה חובה'); return; }
+    setSaving(true);
+    const data = {
+      name: form.name,
+      equipment_number: form.equipment_number,
+      mia_number: form.mia_number,
+      license_number: form.license_number,
+      chassis_number: form.chassis_number,
+      manufacture_year: form.manufacture_year,
+      manufacturer: form.manufacturer,
+      model: form.model,
+      dedicated_type: form.dedicated_type,
+      crane_size: form.crane_size,
+      license_date: form.license_date || null,
+      inspector_date: form.inspector_date || null,
+      transport_license_date: form.transport_license_date || null,
+      equipment_status: form.equipment_status,
+      bonus_percentage: form.bonus_percentage,
+      activity_section: form.activity_section,
+      operator_section: form.operator_section,
+      notes: form.notes,
+    };
+    let res;
+    if (item?.id) {
+      res = await supabase.from('equipment').update(data).eq('id', item.id).select();
+    } else {
+      res = await supabase.from('equipment').insert([data]).select();
+    }
+    setSaving(false);
+    if (res.error) { alert('שגיאה: ' + res.error.message); return; }
+    onSave(res.data[0]);
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <div className="modal-header">
+          <h3>{item ? 'עריכת כלי' : 'הוספת כלי חדש'}</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-grid">
+
+            {/* ── פרק ראשון — זיהוי ── */}
+            <div className="form-section-title">פרק ראשון — זיהוי הכלי</div>
+            <div className="form-group">
+              <label>מספר ציוד</label>
+              <input value={form.equipment_number} onChange={e=>set('equipment_number',e.target.value)} placeholder="מספר פנימי" />
+            </div>
+            <div className="form-group">
+              <label>שם הכלי *</label>
+              <input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="שם הכלי" />
+            </div>
+            <div className="form-group">
+              <label>מספר מי"ה</label>
+              <input value={form.mia_number} onChange={e=>set('mia_number',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>מספר רישוי</label>
+              <input value={form.license_number} onChange={e=>set('license_number',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>מספר שלדה</label>
+              <input value={form.chassis_number} onChange={e=>set('chassis_number',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>שנת ייצור</label>
+              <input value={form.manufacture_year} onChange={e=>set('manufacture_year',e.target.value)} placeholder="2015" />
+            </div>
+            <div className="form-group">
+              <label>יצרן</label>
+              <input value={form.manufacturer} onChange={e=>set('manufacturer',e.target.value)} placeholder="Liebherr, Tadano..." />
+            </div>
+            <div className="form-group">
+              <label>דגם</label>
+              <input value={form.model} onChange={e=>set('model',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>תאריך רישוי</label>
+              <input type="date" value={form.license_date||''} onChange={e=>set('license_date',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>תאריך בודק מוסמך</label>
+              <input type="date" value={form.inspector_date||''} onChange={e=>set('inspector_date',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>תאריך רישיון מוביל</label>
+              <input type="date" value={form.transport_license_date||''} onChange={e=>set('transport_license_date',e.target.value)} />
+            </div>
+
+            {/* ── פרק שני — סיווג ── */}
+            <div className="form-section-title">פרק שני — סיווג ותפעול</div>
+            <div className="form-group">
+              <label>סוג הכלי</label>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {(equipmentTypes||[]).length===0 && <span style={{fontSize:13,color:'var(--text-muted)'}}>אין סוגים — הוסף בעמוד הגדרות</span>}
+                {(equipmentTypes||[]).map(t=>(
+                  <button key={t} type="button"
+                    onClick={()=>set('dedicated_type', form.dedicated_type===t ? '' : t)}
+                    style={{padding:'5px 14px',borderRadius:20,border:'1px solid var(--border)',
+                            cursor:'pointer',fontSize:13,fontFamily:'inherit',
+                            background: form.dedicated_type===t ? 'var(--primary)' : 'white',
+                            color: form.dedicated_type===t ? 'white' : 'var(--text)',
+                            fontWeight: form.dedicated_type===t ? 600 : 400}}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="form-group">
+              <label>גודל המנוף (טון)</label>
+              <input type="number" value={form.crane_size||''} onChange={e=>set('crane_size',e.target.value)} placeholder="100" />
+            </div>
+            <div className="form-group">
+              <label>סטטוס</label>
+              <select value={form.equipment_status} onChange={e=>set('equipment_status',e.target.value)}>
+                {EQ_STATUS_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>אחוזי פרמייה</label>
+              <input value={form.bonus_percentage||''} onChange={e=>set('bonus_percentage',e.target.value)} placeholder="%" />
+            </div>
+            <div className="form-group">
+              <label>סעיף פעילות כלי</label>
+              <input value={form.activity_section||''} onChange={e=>set('activity_section',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>סעיף פעילות מפעיל</label>
+              <input value={form.operator_section||''} onChange={e=>set('operator_section',e.target.value)} />
+            </div>
+
+            {/* ── פרק שלישי — הערות ── */}
+            <div className="form-section-title">פרק שלישי — הערות</div>
+            <div className="form-group full">
+              <label>הערות</label>
+              <textarea rows={4} value={form.notes||''} onChange={e=>set('notes',e.target.value)} placeholder="הערות נוספות..." />
+            </div>
+
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-outline" onClick={onClose}>ביטול</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'שומר...' : 'שמור'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EquipmentPage() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [modal, setModal] = useState(null); // null | 'add' | item
+  const [delTarget, setDelTarget] = useState(null);
+  const [equipmentTypes, setEquipmentTypes] = useState([]);
+  const { toast, show } = useToast();
+
+  // Load equipment types from lookup_lists
+  useEffect(() => {
+    supabase.from('lookup_lists')
+      .select('value')
+      .eq('list_name','equipment_types')
+      .order('sort_order')
+      .then(({data}) => setEquipmentTypes((data||[]).map(r=>r.value)));
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('equipment').select('*').order('name');
+    if (!error) setItems(data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = items.filter(e => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || e.name?.toLowerCase().includes(q) || e.equipment_number?.toLowerCase().includes(q) || e.mia_number?.toLowerCase().includes(q);
+    const matchStatus = filterStatus === 'all' || e.equipment_status === filterStatus;
+    return matchSearch && matchStatus;
+  });
+
+  async function handleDelete() {
+    const { error } = await supabase.from('equipment').delete().eq('id', delTarget.id);
+    if (error) { show('שגיאה במחיקה', 'error'); }
+    else { show('הכלי נמחק בהצלחה'); setItems(p => p.filter(e => e.id !== delTarget.id)); }
+    setDelTarget(null);
+  }
+
+  function handleSaved(saved) {
+    setItems(prev => {
+      const idx = prev.findIndex(e => e.id === saved.id);
+      if (idx >= 0) { const n=[...prev]; n[idx]=saved; return n; }
+      return [...prev, saved];
+    });
+    setModal(null);
+    show(modal?.id ? 'הכלי עודכן בהצלחה' : 'הכלי נוסף בהצלחה');
+  }
+
+  const DEDICATED_LABEL = { crane:'מנוף', heavy:'ציוד כבד', light:'ציוד קל', vehicle:'רכב', other:'אחר' };
+
+  // ── Export to CSV ──
+  function handleExport() {
+    const cols = [
+      ['equipment_number','מספר ציוד'],['name','תיאור'],['mia_number','מספר מי"ה'],
+      ['license_number','מספר רישוי'],['chassis_number','מספר שלדה'],
+      ['manufacture_year','שנת ייצור'],['manufacturer','יצרן'],['model','דגם'],
+      ['dedicated_type','סוג כלי'],['crane_size','גודל'],
+      ['license_date','תאריך רישוי'],['inspector_date','תאריך בדיקה'],
+      ['transport_license_date','רישיון הובלה'],
+      ['equipment_status','סטטוס'],['bonus_percentage','אחוזי פרמיה'],
+      ['activity_section','סעיף פרמיה'],['operator_section','פעילות כלי'],['notes','הערות'],
+    ];
+    const header = cols.map(c=>c[1]).join(',');
+    const rows = items.map(e =>
+      cols.map(([k]) => {
+        const v = e[k] ?? '';
+        return String(v).includes(',') || String(v).includes('\n') ? `"${String(v).replace(/"/g,'""')}"` : String(v);
+      }).join(',')
+    );
+    const csv = '﻿' + header + '\n' + rows.join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `כלים_${new Date().toLocaleDateString('he-IL').replace(/\//g,'-')}.csv`;
+    a.click();
+  }
+
+  // ── Import from CSV ──
+  const importRef = React.useRef();
+  function handleImportClick() { importRef.current.value=''; importRef.current.click(); }
+
+  async function handleImportFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const clean = text.replace(/^﻿/,'');
+    const lines = clean.split(/\r?\n/).filter(l=>l.trim());
+    if (lines.length < 2) { show('הקובץ ריק או לא תקין','error'); return; }
+
+    const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+    const COL = {
+      'מספר ציוד':'equipment_number','תיאור':'name','מספר מי"ה':'mia_number',
+      'מספר רישוי':'license_number','מספר שלדה':'chassis_number',
+      'שנת ייצור':'manufacture_year','יצרן':'manufacturer','דגם':'model',
+      'סוג כלי':'dedicated_type','גודל':'crane_size',
+      'תאריך רישוי':'license_date','תאריך בדיקה':'inspector_date',
+      'רישיון הובלה':'transport_license_date',
+      'סטטוס':'equipment_status','אחוזי פרמיה':'bonus_percentage',
+      'סעיף פרמיה':'activity_section','פעילות כלי':'operator_section','הערות':'notes',
+    };
+
+    function parseLine(line) {
+      const fields=[]; let cur=''; let inQ=false;
+      for (let i=0;i<line.length;i++) {
+        const c=line[i];
+        if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+        else if(c===','&&!inQ){fields.push(cur);cur='';}
+        else cur+=c;
+      }
+      fields.push(cur);
+      return fields;
+    }
+
+    const STATUS_MAP = {'active':'active','inactive':'inactive','maintenance':'maintenance','breakdown':'breakdown','לא נמכר':'active','תקלה':'breakdown'};
+
+    const records = [];
+    for (let i=1;i<lines.length;i++) {
+      const vals = parseLine(lines[i]);
+      if (vals.length < 2) continue;
+      const obj = {};
+      headers.forEach((h,idx) => { const f=COL[h]; if(f) obj[f]=vals[idx]?.trim()||''; });
+      if (!obj.name && !obj.equipment_number) continue;
+      obj.equipment_status = STATUS_MAP[obj.equipment_status] || 'active';
+      ['license_date','inspector_date','transport_license_date'].forEach(k=>{if(!obj[k])obj[k]=null;});
+      if (obj.manufacture_year) obj.manufacture_year = parseInt(obj.manufacture_year)||null;
+      if (obj.crane_size) obj.crane_size = parseFloat(obj.crane_size)||null;
+      if (obj.bonus_percentage) obj.bonus_percentage = parseFloat(obj.bonus_percentage)||null;
+      records.push(obj);
+    }
+
+    if (records.length===0) { show('לא נמצאו שורות תקינות','error'); return; }
+    if (!window.confirm(`נמצאו ${records.length} כלים לייבוא. להמשיך?`)) return;
+
+    const { data, error } = await supabase.from('equipment').insert(records).select();
+    if (error) { show('שגיאת ייבוא: '+error.message,'error'); return; }
+    show(`יובאו ${data.length} כלים בהצלחה!`);
+    load();
+  }
+
+  return (
+    <div>
+      <Toast toast={toast} />
+      {modal && <EquipmentModal item={modal==='add'?null:modal} equipmentTypes={equipmentTypes} onClose={()=>setModal(null)} onSave={handleSaved} />}
+      {delTarget && <ConfirmDialog msg={`למחוק את "${delTarget.name}"?`} onYes={handleDelete} onNo={()=>setDelTarget(null)} />}
+      <input ref={importRef} type="file" accept=".csv" style={{display:'none'}} onChange={handleImportFile}/>
+
+      <div className="page-header">
+        <div><h2>כלים וציוד</h2><p>ניהול ציוד ומנופים</p></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-outline" onClick={handleImportClick}>📥 ייבוא CSV</button>
+          <button className="btn btn-outline" onClick={handleExport}>📤 ייצוא CSV</button>
+          <button className="btn btn-primary" onClick={()=>setModal('add')}>+ הוסף כלי</button>
+        </div>
+      </div>
+
+      <div className="search-box">
+        <input className="search-input" placeholder={'🔍 חיפוש לפי שם, מספר כלי, מי"ה...'} value={search} onChange={e=>setSearch(e.target.value)} />
+      </div>
+
+      <div className="filter-bar">
+        {[['all','הכל'],['active','פעילים'],['inactive','לא פעילים'],['maintenance','בתחזוקה']].map(([v,l])=>(
+          <button key={v} className={`filter-btn${filterStatus===v?' active':''}`} onClick={()=>setFilterStatus(v)}>{l}</button>
+        ))}
+      </div>
+
+      {loading ? <div className="loading"><div className="spinner"></div> טוען...</div> : (
+        <div className="table-card">
+          <div className="table-header">
+            <h3>כלים ({filtered.length})</h3>
+          </div>
+          {filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🏗️</div>
+              <h3>{search || filterStatus!=='all' ? 'לא נמצאו תוצאות' : 'אין כלים עדיין'}</h3>
+              {!search && filterStatus==='all' && <p>לחץ על "הוסף כלי" כדי להתחיל</p>}
+            </div>
+          ) : (
+            <table>
+              <thead><tr>
+                <th>שם הכלי</th><th>מספר כלי</th><th>סוג</th><th>מנוף/גודל</th>
+                <th>מס׳ מי"ה</th><th>יצרן/דגם</th><th>שנה</th><th>סטטוס</th><th>פעולות</th>
+              </tr></thead>
+              <tbody>
+                {filtered.map(e => (
+                  <tr key={e.id}>
+                    <td><strong>{e.name}</strong></td>
+                    <td>{fmt(e.equipment_number)}</td>
+                    <td>{DEDICATED_LABEL[e.dedicated_type] || fmt(e.dedicated_type)}</td>
+                    <td>{fmt(e.crane_size)}</td>
+                    <td>{fmt(e.mia_number)}</td>
+                    <td>{[e.manufacturer,e.model].filter(Boolean).join(' / ') || '—'}</td>
+                    <td>{fmt(e.manufacture_year)}</td>
+                    <td><Badge val={e.equipment_status} type="equipment" /></td>
+                    <td>
+                      <button className="action-btn" title="ערוך" onClick={()=>setModal(e)}>✏️</button>
+                      <button className="action-btn del" title="מחק" onClick={()=>setDelTarget(e)}>🗑️</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EMPLOYEES PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+const EMP_STATUS_OPTIONS = [
+  {value:'active', label:'פעיל'},
+  {value:'inactive', label:'לא פעיל'},
+  {value:'vacation', label:'חופשה'},
+  {value:'sick', label:'מחלה'},
+];
+
+function EmployeeModal({ item, licenseTypes, onClose, onSave }) {
+  const blank = {
+    full_name:'', phone:'', phone2:'', phone3:'', role:'operator', job_title:'',
+    mia_number_old:'', mia_number_new:'', employee_status:'active',
+    birth_date:'', start_date:'', license_expiry:'', license_types:[],
+    affiliation:'', notes:'', address:'', manager_name:'',
+  };
+  const [form, setForm] = useState(item ? {...blank,...item, license_types: item.license_types||[] } : blank);
+  const [saving, setSaving] = useState(false);
+
+  const set = (k,v) => setForm(f => ({...f,[k]:v}));
+  function toggleLicense(t) {
+    setForm(f => ({
+      ...f,
+      license_types: f.license_types.includes(t)
+        ? f.license_types.filter(x=>x!==t)
+        : [...f.license_types, t]
+    }));
+  }
+
+  async function handleSave() {
+    if (!form.full_name.trim()) { alert('שם העובד הוא שדה חובה'); return; }
+    setSaving(true);
+    const data = {...form};
+    if (data.id) { delete data.id; delete data.created_at; }
+    let res;
+    if (item?.id) {
+      res = await supabase.from('employees').update(data).eq('id', item.id).select();
+    } else {
+      res = await supabase.from('employees').insert([data]).select();
+    }
+    setSaving(false);
+    if (res.error) { alert('שגיאה: ' + res.error.message); return; }
+    onSave(res.data[0]);
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <div className="modal-header">
+          <h3>{item ? 'עריכת עובד' : 'הוספת עובד חדש'}</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-grid">
+            <div className="form-section-title">פרטים אישיים</div>
+            <div className="form-group">
+              <label>שם מלא *</label>
+              <input value={form.full_name} onChange={e=>set('full_name',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>טלפון</label>
+              <input value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="050-0000000" />
+            </div>
+            <div className="form-group">
+              <label>תפקיד</label>
+              <select value={form.role} onChange={e=>set('role',e.target.value)}>
+                <option value="operator">מפעיל</option>
+                <option value="driver">נהג</option>
+                <option value="mechanic">מכונאי</option>
+                <option value="supervisor">מפקח</option>
+                <option value="manager">מנהל</option>
+                <option value="other">אחר</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>תפקיד מפורט</label>
+              <input value={form.job_title} onChange={e=>set('job_title',e.target.value)} placeholder="מפעיל מנוף בכיר..." />
+            </div>
+            <div className="form-group">
+              <label>מספר מי"ה ישן</label>
+              <input value={form.mia_number_old} onChange={e=>set('mia_number_old',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>מספר מי"ה חדש</label>
+              <input value={form.mia_number_new} onChange={e=>set('mia_number_new',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>סטטוס</label>
+              <select value={form.employee_status} onChange={e=>set('employee_status',e.target.value)}>
+                {EMP_STATUS_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>תאריך לידה</label>
+              <input type="date" value={form.birth_date||''} onChange={e=>set('birth_date',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>תאריך תחילת עבודה</label>
+              <input type="date" value={form.start_date||''} onChange={e=>set('start_date',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>תוקף רישיון</label>
+              <input type="date" value={form.license_expiry||''} onChange={e=>set('license_expiry',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>טלפון נוסף</label>
+              <input value={form.phone2||''} onChange={e=>set('phone2',e.target.value)} placeholder="טלפון בית / נוסף" />
+            </div>
+            <div className="form-group">
+              <label>טלפון שלישי</label>
+              <input value={form.phone3||''} onChange={e=>set('phone3',e.target.value)} placeholder="טלפון שלישי" />
+            </div>
+            <div className="form-group">
+              <label>שיוך</label>
+              <select value={form.affiliation||''} onChange={e=>set('affiliation',e.target.value)}>
+                <option value="">— בחר —</option>
+                <option value="דור המשך">דור המשך</option>
+                <option value="דור חדש">דור חדש</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>מנהל ישיר</label>
+              <input value={form.manager_name||''} onChange={e=>set('manager_name',e.target.value)} placeholder="שם המנהל" />
+            </div>
+            <div className="form-group">
+              <label>כתובת מגורים</label>
+              <input value={form.address||''} onChange={e=>set('address',e.target.value)} placeholder="כתובת" />
+            </div>
+            <div className="form-group full">
+              <label>הערות</label>
+              <textarea rows={2} value={form.notes||''} onChange={e=>set('notes',e.target.value)} placeholder="הערות נוספות..." style={{width:'100%',resize:'vertical'}} />
+            </div>
+
+            <div className="form-section-title">סוגי רישיון</div>
+            <div className="form-group full">
+              <label>סמן את כל הרישיונות ({licenseTypes.length === 0 ? 'אין רישיונות — הוסף בעמוד הגדרות' : 'מתוך הרשימה בהגדרות'})</label>
+              <div style={{display:'flex', flexWrap:'wrap', gap:8, marginTop:4}}>
+                {licenseTypes.map(t => (
+                  <button key={t} type="button"
+                    onClick={()=>toggleLicense(t)}
+                    style={{
+                      padding:'5px 12px', borderRadius:20, fontSize:12, cursor:'pointer',
+                      border:'1px solid', transition:'all 0.15s',
+                      background: form.license_types.includes(t) ? 'var(--primary)' : 'white',
+                      color: form.license_types.includes(t) ? 'white' : 'var(--text-muted)',
+                      borderColor: form.license_types.includes(t) ? 'var(--primary)' : 'var(--border)',
+                    }}
+                  >{t}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-outline" onClick={onClose}>ביטול</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving?'שומר...':'שמור'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmployeesPage() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [modal, setModal] = useState(null);
+  const [delTarget, setDelTarget] = useState(null);
+  const [licenseTypes, setLicenseTypes] = useState([]);
+  const { toast, show } = useToast();
+
+  // Load license types from lookup_lists table
+  useEffect(() => {
+    supabase.from('lookup_lists')
+      .select('value')
+      .eq('list_name','license_types')
+      .order('sort_order')
+      .then(({data}) => setLicenseTypes((data||[]).map(r=>r.value)));
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('employees').select('*').order('full_name');
+    if (!error) setItems(data||[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = items.filter(e => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || e.full_name?.toLowerCase().includes(q) || e.mia_number_old?.toLowerCase().includes(q) || e.mia_number_new?.toLowerCase().includes(q);
+    const matchStatus = filterStatus==='all' || e.employee_status===filterStatus;
+    return matchSearch && matchStatus;
+  });
+
+  async function handleDelete() {
+    const { error } = await supabase.from('employees').delete().eq('id', delTarget.id);
+    if (error) show('שגיאה במחיקה','error');
+    else { show('העובד נמחק'); setItems(p=>p.filter(e=>e.id!==delTarget.id)); }
+    setDelTarget(null);
+  }
+
+  function handleSaved(saved) {
+    setItems(prev => {
+      const idx=prev.findIndex(e=>e.id===saved.id);
+      if(idx>=0){const n=[...prev];n[idx]=saved;return n;}
+      return [...prev,saved];
+    });
+    setModal(null);
+    show(modal?.id?'העובד עודכן':'העובד נוסף');
+  }
+
+  const ROLE_LABEL = {operator:'מפעיל',driver:'נהג',mechanic:'מכונאי',supervisor:'מפקח',manager:'מנהל',other:'אחר'};
+  const ROLE_FROM_HE = {'מפעיל':'operator','נהג':'driver','מכונאי':'mechanic','מפקח':'supervisor','מנהל':'manager','מנהל עבודה':'supervisor','רי"ח תפעול צמ"ה':'manager'};
+
+  // ── Export to CSV (opens in Excel with Hebrew) ──
+  function handleExport() {
+    const cols = [
+      ['full_name','שם מלא'],['mia_number_old','מספר אישי'],['mia_number_new','מספר כיל'],
+      ['role','תפקיד'],['job_title','תפקיד מפורט'],['employee_status','סטטוס'],
+      ['phone','טלפון נייד'],['phone2','טלפון נוסף'],['phone3','טלפון שלישי'],
+      ['birth_date','תאריך לידה'],['start_date','תאריך תחילת עבודה'],
+      ['license_expiry','תוקף רישיון'],['affiliation','שיוך'],
+      ['manager_name','מנהל'],['address','כתובת'],['notes','הערות'],
+    ];
+    const header = cols.map(c=>c[1]).join(',');
+    const rows = items.map(e =>
+      cols.map(([k]) => {
+        const v = e[k] ?? '';
+        // Wrap in quotes if contains comma or newline
+        return String(v).includes(',') || String(v).includes('\n') ? `"${String(v).replace(/"/g,'""')}"` : String(v);
+      }).join(',')
+    );
+    const csv = '﻿' + header + '\n' + rows.join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `עובדים_${new Date().toLocaleDateString('he-IL').replace(/\//g,'-')}.csv`;
+    a.click();
+  }
+
+  // ── Import from CSV ──
+  const importRef = React.useRef();
+  function handleImportClick() { importRef.current.value=''; importRef.current.click(); }
+
+  async function handleImportFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    // Remove BOM if present
+    const clean = text.replace(/^﻿/,'');
+    const lines = clean.split(/\r?\n/).filter(l=>l.trim());
+    if (lines.length < 2) { show('הקובץ ריק או לא תקין','error'); return; }
+
+    // Parse header
+    const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+    const COL = {
+      'שם מלא':'full_name','מספר אישי':'mia_number_old','מספר כיל':'mia_number_new',
+      'תפקיד':'role','תפקיד מפורט':'job_title','סטטוס':'employee_status',
+      'טלפון נייד':'phone','טלפון נוסף':'phone2','טלפון שלישי':'phone3',
+      'תאריך לידה':'birth_date','תאריך תחילת עבודה':'start_date',
+      'תוקף רישיון':'license_expiry','שיוך':'affiliation',
+      'מנהל':'manager_name','כתובת':'address','הערות':'notes',
+    };
+
+    // Parse rows — handle quoted fields with commas
+    function parseLine(line) {
+      const fields = []; let cur = ''; let inQ = false;
+      for (let i=0; i<line.length; i++) {
+        const c = line[i];
+        if (c==='"') { if (inQ && line[i+1]==='"') { cur+='"'; i++; } else inQ=!inQ; }
+        else if (c===',' && !inQ) { fields.push(cur); cur=''; }
+        else cur+=c;
+      }
+      fields.push(cur);
+      return fields;
+    }
+
+    const STATUS_MAP = {'נוכח':'active','פעיל':'active','לא פעיל':'inactive','inactive':'inactive','active':'active','vacation':'vacation','sick':'sick'};
+
+    const records = [];
+    for (let i=1; i<lines.length; i++) {
+      const vals = parseLine(lines[i]);
+      if (vals.length < 2) continue;
+      const obj = {};
+      headers.forEach((h,idx) => {
+        const field = COL[h];
+        if (field) obj[field] = vals[idx]?.trim() || '';
+      });
+      if (!obj.full_name) continue;
+      // Normalize role from Hebrew
+      if (obj.role && ROLE_FROM_HE[obj.role]) obj.role = ROLE_FROM_HE[obj.role];
+      if (!['operator','driver','mechanic','supervisor','manager','other'].includes(obj.role)) obj.role='operator';
+      // Normalize status
+      obj.employee_status = STATUS_MAP[obj.employee_status] || 'active';
+      // Empty dates → null
+      ['birth_date','start_date','license_expiry'].forEach(k=>{ if(!obj[k]) obj[k]=null; });
+      obj.license_types = [];
+      records.push(obj);
+    }
+
+    if (records.length === 0) { show('לא נמצאו שורות תקינות','error'); return; }
+
+    const confirm = window.confirm(`נמצאו ${records.length} עובדים לייבוא. להמשיך?`);
+    if (!confirm) return;
+
+    const { data, error } = await supabase.from('employees').insert(records).select();
+    if (error) { show('שגיאת ייבוא: ' + error.message, 'error'); return; }
+    show(`יובאו ${data.length} עובדים בהצלחה!`);
+    load();
+  }
+
+  return (
+    <div>
+      <Toast toast={toast}/>
+      {modal && <EmployeeModal item={modal==='add'?null:modal} licenseTypes={licenseTypes} onClose={()=>setModal(null)} onSave={handleSaved}/>}
+      {delTarget && <ConfirmDialog msg={`למחוק את "${delTarget.full_name}"?`} onYes={handleDelete} onNo={()=>setDelTarget(null)}/>}
+      {/* Hidden file input for import */}
+      <input ref={importRef} type="file" accept=".csv" style={{display:'none'}} onChange={handleImportFile}/>
+
+      <div className="page-header">
+        <div><h2>עובדים</h2><p>ניהול עובדים ומפעילים</p></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-outline" onClick={handleImportClick} title="ייבוא מ-CSV">📥 ייבוא CSV</button>
+          <button className="btn btn-outline" onClick={handleExport} title="ייצוא ל-CSV">📤 ייצוא CSV</button>
+          <button className="btn btn-primary" onClick={()=>setModal('add')}>+ הוסף עובד</button>
+        </div>
+      </div>
+
+      <div className="search-box">
+        <input className="search-input" placeholder={'🔍 חיפוש לפי שם, מספר מי"ה...'} value={search} onChange={e=>setSearch(e.target.value)}/>
+      </div>
+      <div className="filter-bar">
+        {[['all','הכל'],['active','פעילים'],['inactive','לא פעילים'],['vacation','חופשה'],['sick','מחלה']].map(([v,l])=>(
+          <button key={v} className={`filter-btn${filterStatus===v?' active':''}`} onClick={()=>setFilterStatus(v)}>{l}</button>
+        ))}
+      </div>
+
+      {loading ? <div className="loading"><div className="spinner"></div> טוען...</div> : (
+        <div className="table-card">
+          <div className="table-header"><h3>עובדים ({filtered.length})</h3></div>
+          {filtered.length===0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">👷</div>
+              <h3>{search||filterStatus!=='all'?'לא נמצאו תוצאות':'אין עובדים עדיין'}</h3>
+              {!search&&filterStatus==='all'&&<p>לחץ על "הוסף עובד" כדי להתחיל</p>}
+            </div>
+          ) : (
+            <table>
+              <thead><tr>
+                <th>שם מלא</th><th>תפקיד</th><th>טלפון</th><th>מי"ה ישן</th><th>מי"ה חדש</th>
+                <th>תחילת עבודה</th><th>תוקף רישיון</th><th>סטטוס</th><th>פעולות</th>
+              </tr></thead>
+              <tbody>
+                {filtered.map(e=>(
+                  <tr key={e.id}>
+                    <td><strong>{e.full_name}</strong></td>
+                    <td>{ROLE_LABEL[e.role]||fmt(e.role)}{e.job_title?<><br/><small style={{color:'var(--text-muted)'}}>{e.job_title}</small></>:null}</td>
+                    <td>{fmt(e.phone)}</td>
+                    <td>{fmt(e.mia_number_old)}</td>
+                    <td>{fmt(e.mia_number_new)}</td>
+                    <td>{fmtDate(e.start_date)}</td>
+                    <td style={{color: e.license_expiry && new Date(e.license_expiry)<new Date() ? 'var(--danger)' : 'inherit'}}>
+                      {fmtDate(e.license_expiry)}
+                    </td>
+                    <td><Badge val={e.employee_status} type="employee"/></td>
+                    <td>
+                      <button className="action-btn" onClick={()=>setModal(e)}>✏️</button>
+                      <button className="action-btn del" onClick={()=>setDelTarget(e)}>🗑️</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ORDERS PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+function OrderModal({ item, equipment, employees, onClose, onSave }) {
+  const ORDER_STATUS = [
+    {value:'pending',label:'ממתין'},{value:'approved',label:'אושר'},
+    {value:'active',label:'בביצוע'},{value:'completed',label:'הושלם'},{value:'cancelled',label:'בוטל'},
+  ];
+
+  const blank = {
+    order_number_display:'', status:'pending', is_external_equipment: false,
+    equipment_id:'', equipment_type:'', equipment_size:'', supplier_name:'',
+    start_date:'', end_date:'', start_time:'', end_time:'',
+    location:'', description:'', admin_notes:'',
+    client_name:'', client_phone:'', client_email:'',
+    site_manager:'', po_number:'',
+  };
+
+  // If historical order has mia_number but no equipment_id (or equipment_id IS a mia_number),
+  // resolve the real UUID equipment_id from the equipment list
+  function resolveEquipmentId(orderItem) {
+    if (!orderItem) return '';
+    // Check if equipment_id is already a valid UUID in our equipment list
+    if (orderItem.equipment_id && equipment.find(e => e.id === orderItem.equipment_id)) {
+      return orderItem.equipment_id;
+    }
+    // equipment_id may be a mia_number (historical import) — resolve to real UUID
+    if (orderItem.equipment_id) {
+      const byMia = equipment.find(e => String(e.mia_number) === String(orderItem.equipment_id));
+      if (byMia) return byMia.id;
+    }
+    // Try mia_number field
+    if (orderItem.mia_number) {
+      const found = equipment.find(e => String(e.mia_number) === String(orderItem.mia_number));
+      if (found) return found.id;
+    }
+    return '';
+  }
+
+  const initForm = item ? {...blank, ...item, equipment_id: resolveEquipmentId(item)} : blank;
+  const [form, setForm] = useState(initForm);
+  const [operators, setOperators] = useState([]);
+  const [authorizedClients, setAuthorizedClients] = useState([]);
+  const [orderStatusOptions, setOrderStatusOptions] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  // Load authorized clients, order statuses + existing operators if editing
+  useEffect(() => {
+    supabase.from('authorized_clients').select('id,full_name,phone,email').eq('is_active',true).order('full_name')
+      .then(({data}) => setAuthorizedClients(data||[]));
+    supabase.from('lookup_lists').select('value').eq('list_name','order_status').order('sort_order')
+      .then(({data}) => setOrderStatusOptions((data||[]).map(r=>r.value)));
+
+    if (item?.id) {
+      supabase.from('order_operators').select('*').eq('order_id', item.id).order('created_at')
+        .then(({data}) => setOperators(data||[]));
+    }
+  }, [item?.id]);
+
+  // Generate next order number for new orders
+  useEffect(() => {
+    if (!item?.id && !form.order_number_display) {
+      const year = new Date().getFullYear();
+      supabase.from('orders').select('order_number_display').like('order_number_display', `${year}-%`)
+        .then(({data}) => {
+          const nums = (data||[]).map(r => parseInt((r.order_number_display||'').split('-')[1]||0)).filter(n=>!isNaN(n));
+          const next = nums.length ? Math.max(...nums)+1 : 1;
+          set('order_number_display', `${year}-${String(next).padStart(3,'0')}`);
+        });
+    }
+  }, []);
+
+  // Select client from authorized list
+  function selectClient(id) {
+    if (!id) return;
+    const c = authorizedClients.find(c=>c.id===id);
+    if (c) { set('client_name', c.full_name); set('client_phone', c.phone||''); set('client_email', c.email||''); }
+  }
+
+  // Operators management
+  function addOperator(empId) {
+    if (!empId) return;
+    const emp = employees.find(e=>e.id===empId);
+    if (!emp) return;
+    if (operators.find(o=>o.employee_id===empId)) return; // already added
+    setOperators(prev=>[...prev, { employee_id:empId, employee_name:emp.full_name, role:emp.role||'', start_time:'', end_time:'', _new:true }]);
+  }
+
+  function removeOperator(idx) {
+    setOperators(prev=>prev.filter((_,i)=>i!==idx));
+  }
+
+  function updateOperator(idx, field, val) {
+    setOperators(prev=>prev.map((o,i)=>i===idx?{...o,[field]:val}:o));
+  }
+
+  async function handleSave() {
+    if (!form.start_date) { alert('תאריך התחלה הוא שדה חובה'); return; }
+    setSaving(true);
+
+    // Save order — strip non-column fields before sending to DB
+    const data = {...form};
+    ['equipment_id'].forEach(k => { if(!data[k]) data[k]=null; });
+    delete data.id; delete data.created_at; delete data.order_operators;
+
+    let orderId = item?.id;
+    let savedOrder;
+    if (item?.id) {
+      const res = await supabase.from('orders').update(data).eq('id',item.id).select().single();
+      if (res.error) { alert('שגיאה: '+res.error.message); setSaving(false); return; }
+      savedOrder = res.data;
+    } else {
+      const res = await supabase.from('orders').insert([data]).select().single();
+      if (res.error) { alert('שגיאה: '+res.error.message); setSaving(false); return; }
+      savedOrder = res.data;
+      orderId = savedOrder.id;
+    }
+
+    // Save operators: delete all existing, re-insert
+    if (orderId) {
+      await supabase.from('order_operators').delete().eq('order_id', orderId);
+      if (operators.length > 0) {
+        const inserts = operators.map(o=>({
+          order_id: orderId,
+          employee_id: o.employee_id,
+          employee_name: o.employee_name,
+          start_time: o.start_time||null,
+          end_time: o.end_time||null,
+          work_date: form.start_date||null,
+          bonus_percentage: o.bonus_percentage||null,
+        }));
+        const { error } = await supabase.from('order_operators').insert(inserts);
+        if (error) { alert('שגיאה בשמירת מפעילים: '+error.message); setSaving(false); return; }
+      }
+    }
+
+    setSaving(false);
+    onSave(savedOrder);
+  }
+
+  const sectionStyle = {
+    background:'var(--primary-light)', borderRadius:10, padding:'14px 16px',
+    marginBottom:16, border:'1px solid var(--primary-light)'
+  };
+  const sectionTitle = {
+    fontSize:14, fontWeight:700, color:'var(--primary-dark)',
+    marginBottom:12, display:'flex', alignItems:'center', gap:6
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{maxWidth:680}}>
+        <div className="modal-header">
+          <h3>{item?`עריכת הזמנה ${item.order_number_display||''}` : 'הזמנה חדשה'}</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+
+          {/* ── 1. בחירת כלי ── */}
+          <div style={sectionStyle}>
+            <div style={sectionTitle}>🏗️ בחירת כלי</div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <button type="button"
+                onClick={()=>set('is_external_equipment',false)}
+                style={{flex:1,padding:'8px',borderRadius:8,border:'2px solid',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,
+                        borderColor:!form.is_external_equipment?'var(--primary)':'var(--border)',
+                        background:!form.is_external_equipment?'var(--primary)':'white',
+                        color:!form.is_external_equipment?'white':'var(--text)'}}>
+                כלי מחצי
+              </button>
+              <button type="button"
+                onClick={()=>set('is_external_equipment',true)}
+                style={{flex:1,padding:'8px',borderRadius:8,border:'2px solid',cursor:'pointer',fontFamily:'inherit',fontSize:13,fontWeight:600,
+                        borderColor:form.is_external_equipment?'var(--primary)':'var(--border)',
+                        background:form.is_external_equipment?'var(--primary)':'white',
+                        color:form.is_external_equipment?'white':'var(--text)'}}>
+                כלי חיצוני מזמן
+              </button>
+            </div>
+
+            {!form.is_external_equipment ? (
+              <div className="form-group">
+                <label>בחר כלי להזמנה</label>
+                <select value={form.equipment_id||''} onChange={e=>set('equipment_id',e.target.value)}>
+                  <option value="">— בחר כלי —</option>
+                  {equipment.map(eq=><option key={eq.id} value={eq.id}>{eq.name}{eq.equipment_number?` (${eq.equipment_number})`:''}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>סוג הכלי</label>
+                  <input value={form.equipment_type||''} onChange={e=>set('equipment_type',e.target.value)} placeholder="למשל: מנוף, מחפר..." />
+                </div>
+                <div className="form-group">
+                  <label>גודל הכלי</label>
+                  <input value={form.equipment_size||''} onChange={e=>set('equipment_size',e.target.value)} placeholder="למשל: 20 טון, 5 מטר..." />
+                </div>
+                <div className="form-group full">
+                  <label>שם הספק</label>
+                  <input value={form.supplier_name||''} onChange={e=>set('supplier_name',e.target.value)} placeholder="שם החברה המספקת" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── 2. פרטי מזמין ── */}
+          <div style={sectionStyle}>
+            <div style={sectionTitle}>👤 פרטי המזמין</div>
+            <div className="form-group" style={{marginBottom:10}}>
+              <label>בחר מזמין מהרשימה</label>
+              <select onChange={e=>selectClient(e.target.value)} defaultValue="">
+                <option value="">— בחר מזמין מורשה או 'אחר' —</option>
+                {authorizedClients.map(c=><option key={c.id} value={c.id}>{c.full_name}</option>)}
+              </select>
+            </div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label>שם מלא</label>
+                <input value={form.client_name||''} onChange={e=>set('client_name',e.target.value)} placeholder="שם המזמין" />
+              </div>
+              <div className="form-group">
+                <label>טלפון</label>
+                <input value={form.client_phone||''} onChange={e=>set('client_phone',e.target.value)} placeholder="050-1234567" />
+              </div>
+              <div className="form-group full">
+                <label>אימייל</label>
+                <input value={form.client_email||''} onChange={e=>set('client_email',e.target.value)} placeholder="email@example.com" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── 3. פרטי עבודה ── */}
+          <div style={{...sectionStyle, background:'#fff8f0', borderColor:'#fed7aa'}}>
+            <div style={{...sectionTitle, color:'#c2410c'}}>📋 פרטי העבודה</div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label>שם אחראי בשטח</label>
+                <input value={form.site_manager||''} onChange={e=>set('site_manager',e.target.value)} placeholder="שם האחראי" />
+              </div>
+              <div className="form-group">
+                <label>מספר פק"ע</label>
+                <input value={form.po_number||''} onChange={e=>set('po_number',e.target.value)} placeholder="מספר הזמנת עבודה" />
+              </div>
+              <div className="form-group">
+                <label>תאריך התחלה *</label>
+                <input type="date" value={form.start_date||''} onChange={e=>set('start_date',e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>תאריך סיום *</label>
+                <input type="date" value={form.end_date||''} onChange={e=>set('end_date',e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>שעת התחלה</label>
+                <input type="time" value={form.start_time||''} onChange={e=>set('start_time',e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>שעת סיום</label>
+                <input type="time" value={form.end_time||''} onChange={e=>set('end_time',e.target.value)} />
+              </div>
+              <div className="form-group full">
+                <label>מיקום העבודה</label>
+                <input value={form.location||''} onChange={e=>set('location',e.target.value)} placeholder="כתובת או תיאור מיקום" />
+              </div>
+              <div className="form-group full">
+                <label>תיאור העבודה</label>
+                <textarea value={form.description||''} onChange={e=>set('description',e.target.value)} placeholder="תאר את העבודה הנדרשת..." rows={3}/>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 4. שיבוץ מפעילים ── */}
+          <div style={{...sectionStyle, background:'#f0fdf4', borderColor:'#bbf7d0'}}>
+            <div style={{...sectionTitle, color:'#15803d'}}>👷 שיבוץ מפעילים</div>
+
+            {operators.length > 0 && (
+              <div style={{marginBottom:10}}>
+                {operators.map((op,idx)=>(
+                  <div key={idx} style={{background:'white',borderRadius:8,padding:'10px 12px',
+                                         marginBottom:8,border:'1px solid #bbf7d0',display:'flex',
+                                         flexDirection:'column',gap:8}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <div style={{width:32,height:32,borderRadius:'50%',
+                                     background:'linear-gradient(135deg,var(--primary),#d97706)',
+                                     display:'flex',alignItems:'center',justifyContent:'center',
+                                     color:'white',fontWeight:700,fontSize:13}}>
+                          {op.employee_name?.[0]}
+                        </div>
+                        <div>
+                          <div style={{fontWeight:600,fontSize:13}}>{op.employee_name}</div>
+                          <div style={{fontSize:11,color:'var(--text-muted)'}}>{op.role||''}</div>
+                        </div>
+                      </div>
+                      <button type="button" onClick={()=>removeOperator(idx)}
+                        style={{background:'none',border:'none',cursor:'pointer',color:'var(--danger)',fontSize:16}}>✕</button>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                      <div>
+                        <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:3}}>שעת התחלה</label>
+                        <input type="time" value={op.start_time||''}
+                          onChange={e=>updateOperator(idx,'start_time',e.target.value)}
+                          style={{width:'100%',padding:'5px 8px',border:'1px solid var(--border)',borderRadius:6,fontSize:13,fontFamily:'inherit'}}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:3}}>שעת סיום</label>
+                        <input type="time" value={op.end_time||''}
+                          onChange={e=>updateOperator(idx,'end_time',e.target.value)}
+                          style={{width:'100%',padding:'5px 8px',border:'1px solid var(--border)',borderRadius:6,fontSize:13,fontFamily:'inherit'}}/>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:13,color:'#15803d',fontWeight:600,whiteSpace:'nowrap'}}>+ הוסף מפעיל:</span>
+              <select onChange={e=>{addOperator(e.target.value);e.target.value='';}}
+                style={{flex:1,padding:'7px 10px',border:'1px solid #bbf7d0',borderRadius:8,
+                        fontSize:13,fontFamily:'inherit',background:'white'}}>
+                <option value="">בחר מפעיל להוספה</option>
+                {employees.filter(e=>!operators.find(o=>o.employee_id===e.id)).map(e=>(
+                  <option key={e.id} value={e.id}>{e.full_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* ── הערות מנהל + מספר הזמנה + סטטוס ── */}
+          <div className="form-grid">
+            <div className="form-group">
+              <label>מספר הזמנה (אוטומטי)</label>
+              <input
+                value={form.order_number_display||'טוען...'}
+                readOnly
+                style={{background:'#f5f5f4',color:'var(--primary)',fontWeight:700,cursor:'default',border:'1px solid var(--border)'}}
+              />
+            </div>
+            <div className="form-group">
+              <label>סטטוס</label>
+              <select value={form.status} onChange={e=>set('status',e.target.value)}>
+                {(orderStatusOptions.length ? orderStatusOptions : ORDER_STATUS.map(o=>o.label)).map(v=>(
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group full">
+              <label>הערות מנהל</label>
+              <textarea value={form.admin_notes||''} onChange={e=>set('admin_notes',e.target.value)} rows={2} placeholder="הערות פנימיות..." />
+            </div>
+          </div>
+
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-outline" onClick={onClose}>ביטול</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving?'שומר...':'שלח הזמנה'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrdersPage() {
+  const [orders, setOrders] = useState([]);
+  const [equipment, setEquipment] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [orderStatusOptions, setOrderStatusOptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [modal, setModal] = useState(null);
+  const [delTarget, setDelTarget] = useState(null);
+  const { toast, show } = useToast();
+
+  useEffect(() => {
+    supabase.from('lookup_lists').select('value').eq('list_name','order_status').order('sort_order')
+      .then(({data}) => setOrderStatusOptions((data||[]).map(r=>r.value)));
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [ord, eq, emp] = await Promise.all([
+      supabase.from('orders').select('*,order_operators(employee_name,work_date,start_time,end_time,work_hours)').order('start_date',{ascending:false}).order('mia_number'),
+      supabase.from('equipment').select('id,name,equipment_number,dedicated_type,mia_number').order('name'),
+      supabase.from('employees').select('id,full_name,role').eq('employee_status','active').order('full_name'),
+    ]);
+    setOrders(ord.data||[]);
+    setEquipment(eq.data||[]);
+    setEmployees(emp.data||[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Display: name + mia_number (not equipment_number which can be a long SAP number)
+  const eqMap    = Object.fromEntries(equipment.map(e=>[e.id, `${e.name}${e.mia_number?' מי"ה ('+e.mia_number+')':''}`]));
+  const eqMiaMap = Object.fromEntries(equipment.filter(e=>e.mia_number).map(e=>[String(e.mia_number), e]));
+  const empMap   = Object.fromEntries(employees.map(e=>[e.id, e.full_name]));
+
+  // Resolve equipment display for an order
+  function eqLabel(o) {
+    // 1. Try equipment_id → UUID lookup in eqMap
+    if (o.equipment_id && eqMap[o.equipment_id]) return eqMap[o.equipment_id];
+    // 2. Try equipment_id as mia_number (historical orders stored mia_number in equipment_id field)
+    if (o.equipment_id && eqMiaMap[String(o.equipment_id)]) {
+      const e = eqMiaMap[String(o.equipment_id)];
+      return `${e.name} מי"ה (${o.equipment_id})`;
+    }
+    // 3. Try mia_number field
+    if (o.mia_number && eqMiaMap[String(o.mia_number)]) {
+      const e = eqMiaMap[String(o.mia_number)];
+      return `${e.name} מי"ה (${o.mia_number})`;
+    }
+    if (o.mia_number) return `מי"ה ${o.mia_number}`;
+    if (o.is_external_equipment) return [o.equipment_type, o.equipment_size].filter(Boolean).join(' / ') || 'חיצוני';
+    return '—';
+  }
+
+  const filtered = orders.filter(o => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || o.project_name?.toLowerCase().includes(q) || o.client_name?.toLowerCase().includes(q) || o.order_number?.toLowerCase().includes(q);
+    const matchStatus = filterStatus==='all' || o.status===filterStatus;
+    return matchSearch && matchStatus;
+  });
+
+  async function handleDelete() {
+    const { error } = await supabase.from('orders').delete().eq('id',delTarget.id);
+    if (error) show('שגיאה במחיקה','error');
+    else { show('ההזמנה נמחקה'); setOrders(p=>p.filter(o=>o.id!==delTarget.id)); }
+    setDelTarget(null);
+  }
+
+  function handleSaved(saved) {
+    setOrders(prev=>{
+      const idx=prev.findIndex(o=>o.id===saved.id);
+      if(idx>=0){const n=[...prev];n[idx]=saved;return n;}
+      return [saved,...prev];
+    });
+    setModal(null);
+    load(); // reload to get operators
+    show(modal?.id?'ההזמנה עודכנה':'ההזמנה נוספה');
+  }
+
+  // Duplicate order: copy to next day, no operators
+  async function duplicateOrder(o) {
+    const nextDate = d => {
+      if (!d) return '';
+      const dt = new Date(d); dt.setDate(dt.getDate()+1);
+      return dt.toISOString().slice(0,10);
+    };
+    // Generate next order number
+    const year = new Date().getFullYear();
+    const { data: existing } = await supabase.from('orders').select('order_number_display').like('order_number_display',`${year}-%`);
+    const nums = (existing||[]).map(r=>parseInt((r.order_number_display||'').split('-')[1]||0)).filter(n=>!isNaN(n));
+    const next = nums.length ? Math.max(...nums)+1 : 1;
+    const newNum = `${year}-${String(next).padStart(3,'0')}`;
+
+    const { id, created_at, order_operators, ...rest } = o;
+    const newOrder = { ...rest, order_number_display: newNum,
+      start_date: nextDate(o.start_date), end_date: nextDate(o.end_date),
+      status: 'pending' };
+    const { data, error } = await supabase.from('orders').insert([newOrder]).select().single();
+    if (error) { show('שגיאה בשכפול: '+error.message,'error'); return; }
+    setOrders(prev=>[data,...prev]);
+    show(`ההזמנה שוכפלה → ${newNum}`);
+  }
+
+  return (
+    <div>
+      <Toast toast={toast}/>
+      {modal && <OrderModal item={modal==='add'?null:modal} equipment={equipment} employees={employees} onClose={()=>setModal(null)} onSave={handleSaved}/>}
+      {delTarget && <ConfirmDialog msg={`למחוק את הזמנה "${delTarget.project_name}"?`} onYes={handleDelete} onNo={()=>setDelTarget(null)}/>}
+
+      <div className="page-header">
+        <div><h2>הזמנות</h2><p>ניהול הזמנות עבודה והשיבוצים</p></div>
+        <button className="btn btn-primary" onClick={()=>setModal('add')}>+ הזמנה חדשה</button>
+      </div>
+
+      <div className="search-box">
+        <input className="search-input" placeholder="🔍 חיפוש לפי פרויקט, לקוח, מספר הזמנה..." value={search} onChange={e=>setSearch(e.target.value)}/>
+      </div>
+      <div className="filter-bar">
+        <button className={`filter-btn${filterStatus==='all'?' active':''}`} onClick={()=>setFilterStatus('all')}>הכל</button>
+        {orderStatusOptions.map(v=>(
+          <button key={v} className={`filter-btn${filterStatus===v?' active':''}`} onClick={()=>setFilterStatus(v)}>{v}</button>
+        ))}
+      </div>
+
+      {loading ? <div className="loading"><div className="spinner"></div> טוען...</div> : (
+        <div className="table-card">
+          <div className="table-header"><h3>הזמנות ({filtered.length})</h3></div>
+          {filtered.length===0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">📋</div>
+              <h3>{search||filterStatus!=='all'?'לא נמצאו תוצאות':'אין הזמנות עדיין'}</h3>
+              {!search&&filterStatus==='all'&&<p>לחץ על "הזמנה חדשה" כדי להתחיל</p>}
+            </div>
+          ) : (
+            <div className="table-scroll">
+            <table>
+              <thead><tr>
+                <th>פק"ע</th><th>כלי</th><th>מזמין</th><th>מפעילים</th>
+                <th>התחלה</th><th>סיום</th><th>מיקום</th><th>סטטוס</th><th>פעולות</th>
+              </tr></thead>
+              <tbody>
+                {filtered.map((o,i)=>(
+                  <tr key={o.id}>
+                    <td><strong style={{color:'var(--primary)'}}>{o.order_number_display||'—'}</strong></td>
+                    <td style={{fontSize:12}}>{eqLabel(o)}</td>
+                    <td>{fmt(o.client_name)}</td>
+                    <td style={{fontSize:12}}>
+                      {(() => {
+                        // Filter operators for this order's date
+                        const dayOps = (o.order_operators||[]).filter(op => !op.work_date || op.work_date === o.start_date);
+                        const names = [...new Set(dayOps.map(op=>op.employee_name))];
+                        return names.length > 0
+                          ? names.join(', ')
+                          : <span style={{color:'var(--text-muted)'}}>לא שובץ</span>;
+                      })()}
+                    </td>
+                    <td>{fmtDate(o.start_date)}</td>
+                    <td>{fmtDate(o.end_date)}</td>
+                    <td style={{fontSize:12,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{fmt(o.location)}</td>
+                    <td><Badge val={o.status} type="order"/></td>
+                    <td style={{whiteSpace:'nowrap'}}>
+                      <button className="action-btn" onClick={()=>setModal(o)} title="עריכה">✏️</button>
+                      <button className="action-btn" onClick={()=>duplicateOrder(o)} title="שכפל ליום הבא">📋</button>
+                      <button className="action-btn del" onClick={()=>setDelTarget(o)} title="מחיקה">🗑️</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TASKS PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+function TaskModal({ item, equipment, employees, onClose, onSave }) {
+  const blank = {
+    title:'', description:'', status:'open', priority:'medium',
+    assigned_to:'', equipment_id:'', due_date:'', notes:'',
+  };
+  const [form, setForm] = useState(item ? {...blank,...item} : blank);
+  const [saving, setSaving] = useState(false);
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  async function handleSave() {
+    if (!form.title.trim()) { alert('כותרת המשימה היא שדה חובה'); return; }
+    setSaving(true);
+    const data = {...form};
+    ['assigned_to','equipment_id'].forEach(k => { if(!data[k]) data[k]=null; });
+    if(data.id){delete data.id;delete data.created_at;}
+    let res;
+    if(item?.id) res = await supabase.from('tasks').update(data).eq('id',item.id).select();
+    else res = await supabase.from('tasks').insert([data]).select();
+    setSaving(false);
+    if(res.error){alert('שגיאה: '+res.error.message);return;}
+    onSave(res.data[0]);
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal">
+        <div className="modal-header">
+          <h3>{item?'עריכת משימה':'משימה חדשה'}</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-grid">
+            <div className="form-group full">
+              <label>כותרת *</label>
+              <input value={form.title} onChange={e=>set('title',e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label>סטטוס</label>
+              <select value={form.status} onChange={e=>set('status',e.target.value)}>
+                <option value="open">פתוח</option>
+                <option value="in_progress">בביצוע</option>
+                <option value="done">הושלם</option>
+                <option value="cancelled">בוטל</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>עדיפות</label>
+              <select value={form.priority} onChange={e=>set('priority',e.target.value)}>
+                <option value="low">נמוכה</option>
+                <option value="medium">בינונית</option>
+                <option value="high">גבוהה</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>הוקצה ל</label>
+              <select value={form.assigned_to||''} onChange={e=>set('assigned_to',e.target.value)}>
+                <option value="">— בחר —</option>
+                {employees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>כלי קשור</label>
+              <select value={form.equipment_id||''} onChange={e=>set('equipment_id',e.target.value)}>
+                <option value="">— בחר —</option>
+                {equipment.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>תאריך יעד</label>
+              <input type="date" value={form.due_date||''} onChange={e=>set('due_date',e.target.value)} />
+            </div>
+            <div className="form-group full">
+              <label>תיאור</label>
+              <textarea value={form.description} onChange={e=>set('description',e.target.value)} />
+            </div>
+            <div className="form-group full">
+              <label>הערות</label>
+              <textarea value={form.notes} onChange={e=>set('notes',e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-outline" onClick={onClose}>ביטול</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving?'שומר...':'שמור'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TasksPage() {
+  const [tasks, setTasks] = useState([]);
+  const [equipment, setEquipment] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [modal, setModal] = useState(null);
+  const [delTarget, setDelTarget] = useState(null);
+  const { toast, show } = useToast();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [t, eq, emp] = await Promise.all([
+      supabase.from('tasks').select('*').order('created_at',{ascending:false}),
+      supabase.from('equipment').select('id,name').order('name'),
+      supabase.from('employees').select('id,full_name').order('full_name'),
+    ]);
+    setTasks(t.data||[]);
+    setEquipment(eq.data||[]);
+    setEmployees(emp.data||[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const eqMap = Object.fromEntries(equipment.map(e=>[e.id,e.name]));
+  const empMap = Object.fromEntries(employees.map(e=>[e.id,e.full_name]));
+
+  const filtered = tasks.filter(t => filterStatus==='all' || t.status===filterStatus);
+
+  async function handleDelete() {
+    const { error } = await supabase.from('tasks').delete().eq('id',delTarget.id);
+    if(error) show('שגיאה','error');
+    else { show('המשימה נמחקה'); setTasks(p=>p.filter(t=>t.id!==delTarget.id)); }
+    setDelTarget(null);
+  }
+
+  function handleSaved(saved) {
+    setTasks(prev=>{
+      const idx=prev.findIndex(t=>t.id===saved.id);
+      if(idx>=0){const n=[...prev];n[idx]=saved;return n;}
+      return [saved,...prev];
+    });
+    setModal(null);
+    show(modal?.id?'המשימה עודכנה':'המשימה נוספה');
+  }
+
+  const PRIORITY_BADGE = { low:'badge-gray', medium:'badge-blue', high:'badge-red' };
+  const PRIORITY_LABEL = { low:'נמוכה', medium:'בינונית', high:'גבוהה' };
+
+  return (
+    <div>
+      <Toast toast={toast}/>
+      {modal && <TaskModal item={modal==='add'?null:modal} equipment={equipment} employees={employees} onClose={()=>setModal(null)} onSave={handleSaved}/>}
+      {delTarget && <ConfirmDialog msg={`למחוק את "${delTarget.title}"?`} onYes={handleDelete} onNo={()=>setDelTarget(null)}/>}
+
+      <div className="page-header">
+        <div><h2>משימות</h2><p>מעקב אחר משימות שוטפות</p></div>
+        <button className="btn btn-primary" onClick={()=>setModal('add')}>+ משימה חדשה</button>
+      </div>
+
+      <div className="filter-bar">
+        {[['all','הכל'],['open','פתוח'],['in_progress','בביצוע'],['done','הושלם'],['cancelled','בוטל']].map(([v,l])=>(
+          <button key={v} className={`filter-btn${filterStatus===v?' active':''}`} onClick={()=>setFilterStatus(v)}>{l}</button>
+        ))}
+      </div>
+
+      {loading ? <div className="loading"><div className="spinner"></div> טוען...</div> : (
+        filtered.length===0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">✅</div>
+            <h3>{filterStatus!=='all'?'לא נמצאו משימות':'אין משימות עדיין'}</h3>
+          </div>
+        ) : (
+          filtered.map(t => (
+            <div key={t.id} className="task-card">
+              <div className="task-card-header">
+                <div>
+                  <h4>{t.title}</h4>
+                  {t.description && <p>{t.description}</p>}
+                </div>
+                <div style={{display:'flex',gap:6,flexShrink:0}}>
+                  <button className="action-btn" onClick={()=>setModal(t)}>✏️</button>
+                  <button className="action-btn del" onClick={()=>setDelTarget(t)}>🗑️</button>
+                </div>
+              </div>
+              <div className="task-card-meta">
+                <Badge val={t.status} type="task"/>
+                <span className={`badge ${PRIORITY_BADGE[t.priority]||'badge-gray'}`}>{PRIORITY_LABEL[t.priority]||t.priority}</span>
+                {t.assigned_to && <span className="badge badge-gray">👷 {empMap[t.assigned_to]||'—'}</span>}
+                {t.equipment_id && <span className="badge badge-gray">🏗️ {eqMap[t.equipment_id]||'—'}</span>}
+                {t.due_date && <span className="badge badge-gray" style={{color: new Date(t.due_date)<new Date()&&t.status!=='done'?'var(--danger)':'inherit'}}>📅 {fmtDate(t.due_date)}</span>}
+              </div>
+            </div>
+          ))
+        )
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AVAILABILITY PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+// Helper: is a date string a Friday or Saturday?
+function isWeekend(dateStr) {
+  // Parse date parts directly to avoid UTC timezone offset issues
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const day = new Date(y, m - 1, d).getDay(); // 0=Sun,5=Fri,6=Sat
+  return day === 5 || day === 6;
+}
+
+// Format date for display in Hebrew
+function formatDateHe(dateStr) {
+  const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return `יום ${days[dt.getDay()]}, ${d.toString().padStart(2,'0')}/${m.toString().padStart(2,'0')}/${y}`;
+}
+
+const EQUIPMENT_OPTIONS = [
+  {value:'available',    label:'זמין',        color:'#16a34a', bg:'#dcfce7'},
+  {value:'breakdown',    label:'תקלה',        color:'#dc2626', bg:'#fee2e2'},
+  {value:'maintenance',  label:'בתחזוקה',     color:'#d97706', bg:'#fef3c7'},
+  {value:'no_crew',      label:'חוסר כ"א',   color:'#7c3aed', bg:'#ede9fe'},
+  {value:'sold',         label:'נמכר',        color:'#78716c', bg:'#f5f5f4'},
+];
+
+const ATTENDANCE_OPTIONS = [
+  {value:'present',       label:'נוכח',           color:'#16a34a', bg:'#dcfce7'},
+  {value:'weekend',       label:'סופ"ש',           color:'#0369a1', bg:'#dbeafe'},
+  {value:'vacation',      label:'חופשה',           color:'#d97706', bg:'#fef3c7'},
+  {value:'sick',          label:'מחלה',            color:'#dc2626', bg:'#fee2e2'},
+  {value:'reserve_duty',  label:'מילואים',         color:'#7c3aed', bg:'#ede9fe'},
+  {value:'medical',       label:'בדיקות רפואיות',  color:'#0891b2', bg:'#cffafe'},
+  {value:'training',      label:'הדרכה',           color:'#0284c7', bg:'#e0f2fe'},
+  {value:'external_duty', label:'תפקיד חוץ',       color:'#059669', bg:'#d1fae5'},
+  {value:'early_leave',   label:'עלייה מוקדמת',    color:'#ca8a04', bg:'#fef9c3'},
+  {value:'other',         label:'אחר',             color:'#78716c', bg:'#f5f5f4'},
+];
+
+function AvailabilityPage() {
+  const [equipment, setEquipment] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [statusMap, setStatusMap] = useState({}); // key: "type:id" => {id, status, notes}
+  const [eqStatusOptions, setEqStatusOptions] = useState([]);
+  const [attendanceOptions, setAttendanceOptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(false);
+  const [dayConfirmed, setDayConfirmed] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0,10));
+  const [openNotes, setOpenNotes] = useState(null); // "type:id" or null
+  const [notesDraft, setNotesDraft] = useState('');
+  const { toast, show } = useToast();
+
+  // Load status options from lookup_lists
+  useEffect(() => {
+    supabase.from('lookup_lists').select('value,list_name').in('list_name',['equipment_status_options','attendance_status']).order('sort_order')
+      .then(({data}) => {
+        const d = data||[];
+        setEqStatusOptions(d.filter(r=>r.list_name==='equipment_status_options').map(r=>r.value));
+        setAttendanceOptions(d.filter(r=>r.list_name==='attendance_status').map(r=>r.value));
+      });
+  }, []);
+
+  // Load data for selected date
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [eqRes, empRes, eqStatusRes, empStatusRes] = await Promise.all([
+      supabase.from('equipment').select('id,name,equipment_number,dedicated_type,mia_number').eq('equipment_status','active').order('name'),
+      supabase.from('employees').select('id,full_name,role,mia_number_new').eq('employee_status','active').order('full_name'),
+      supabase.from('daily_status').select('*').eq('record_date', selectedDate),
+      supabase.from('employee_daily_status').select('*').eq('record_date', selectedDate),
+    ]);
+    setEquipment(eqRes.data||[]);
+    setEmployees(empRes.data||[]);
+
+    // Build status map
+    const map = {};
+
+    // Equipment statuses (from daily_status)
+    (eqStatusRes.data||[]).forEach(r => { map[`equipment:${r.entity_id}`] = r; });
+
+    // Default for equipment: copy from previous day if no record today
+    const equipWithoutRecord = (eqRes.data||[]).filter(eq => !map[`equipment:${eq.id}`]);
+    if (equipWithoutRecord.length > 0) {
+      const prev = new Date(selectedDate); prev.setDate(prev.getDate()-1);
+      const prevDate = prev.toISOString().slice(0,10);
+      const { data: prevData } = await supabase.from('daily_status').select('*')
+        .eq('record_date', prevDate).eq('entity_type','equipment');
+      (prevData||[]).forEach(r => {
+        const key = `equipment:${r.entity_id}`;
+        if (!map[key]) map[key] = { ...r, _default: true, id: null };
+      });
+    }
+
+    // Employee statuses (from employee_daily_status)
+    (empStatusRes.data||[]).forEach(r => { map[`employee:${r.employee_id}`] = r; });
+
+    // Default for employees: weekend → סופ"ש, else → נוכח
+    const weekend = isWeekend(selectedDate);
+    (empRes.data||[]).forEach(emp => {
+      const key = `employee:${emp.id}`;
+      if (!map[key]) map[key] = { status: weekend ? 'weekend' : 'present', notes: '', _default: true };
+    });
+
+    setStatusMap(map);
+
+    // Check if this day was confirmed
+    const { data: confData } = await supabase.from('confirmed_days').select('record_date').eq('record_date', selectedDate).maybeSingle();
+    setDayConfirmed(!!confData);
+
+    setLoading(false);
+  }, [selectedDate]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Confirm day: save all defaults to DB and mark day as confirmed
+  async function confirmDay() {
+    setConfirming(true);
+    const weekend = isWeekend(selectedDate);
+
+    // Build inserts for employees with no DB record
+    const empInserts = employees
+      .filter(emp => !statusMap[`employee:${emp.id}`] || statusMap[`employee:${emp.id}`]._default)
+      .map(emp => {
+        const existing = statusMap[`employee:${emp.id}`];
+        return { record_date: selectedDate, employee_id: emp.id,
+                 status: existing?.status || (weekend ? 'weekend' : 'present'),
+                 notes: existing?.notes || '' };
+      });
+
+    // Build inserts for equipment with no DB record
+    const eqInserts = equipment
+      .filter(eq => !statusMap[`equipment:${eq.id}`] || statusMap[`equipment:${eq.id}`]._default)
+      .map(eq => {
+        const existing = statusMap[`equipment:${eq.id}`];
+        return { record_date: selectedDate, entity_type: 'equipment', entity_id: eq.id,
+                 status: existing?.status || '',
+                 notes: existing?.notes || '' };
+      });
+
+    // Insert employees
+    if (empInserts.length > 0) {
+      const { error } = await supabase.from('employee_daily_status').upsert(empInserts, { onConflict: 'record_date,employee_id' });
+      if (error) { show('שגיאה בשמירת עובדים: '+error.message, 'error'); setConfirming(false); return; }
+    }
+
+    // Insert equipment
+    if (eqInserts.length > 0) {
+      const { error } = await supabase.from('daily_status').upsert(eqInserts, { onConflict: 'record_date,entity_id' });
+      if (error) { show('שגיאה בשמירת כלים: '+error.message, 'error'); setConfirming(false); return; }
+    }
+
+    // Mark day as confirmed
+    const { error: confError } = await supabase.from('confirmed_days')
+      .upsert({ record_date: selectedDate, confirmed_at: new Date().toISOString() }, { onConflict: 'record_date' });
+    if (confError) { show('שגיאה באישור: '+confError.message, 'error'); setConfirming(false); return; }
+
+    setDayConfirmed(true);
+    setConfirming(false);
+    show('היום אושר ✅ כל הרשומות נשמרו');
+    load(); // reload to get real DB records
+  }
+
+  // Save equipment status
+  async function saveEquipmentStatus(equipId, status, notes) {
+    const key = `equipment:${equipId}`;
+    const existing = statusMap[key];
+    let res;
+    if (!existing || existing._default) {
+      res = await supabase.from('daily_status')
+        .insert({ record_date: selectedDate, entity_type: 'equipment', entity_id: equipId, status, notes: notes||'' })
+        .select().single();
+    } else {
+      res = await supabase.from('daily_status')
+        .update({ status, notes: notes||'', updated_at: new Date().toISOString() })
+        .eq('id', existing.id).select().single();
+    }
+    if (res.error) { show('שגיאה: '+res.error.message,'error'); return; }
+    setStatusMap(prev => ({ ...prev, [key]: res.data }));
+    show('עודכן ✓');
+  }
+
+  // Save employee status
+  async function saveEmployeeStatus(empId, status, notes) {
+    const key = `employee:${empId}`;
+    const existing = statusMap[key];
+    let res;
+    if (!existing || existing._default) {
+      res = await supabase.from('employee_daily_status')
+        .insert({ record_date: selectedDate, employee_id: empId, status, notes: notes||'' })
+        .select().single();
+    } else {
+      res = await supabase.from('employee_daily_status')
+        .update({ status, notes: notes||'', updated_at: new Date().toISOString() })
+        .eq('id', existing.id).select().single();
+    }
+    if (res.error) { show('שגיאה: '+res.error.message,'error'); return; }
+    setStatusMap(prev => ({ ...prev, [key]: res.data }));
+    show('עודכן ✓');
+  }
+
+  // Copy previous day's equipment statuses
+  async function copyFromYesterday() {
+    const prev = new Date(selectedDate); prev.setDate(prev.getDate()-1);
+    const prevDate = prev.toISOString().slice(0,10);
+    const { data, error } = await supabase.from('daily_status').select('*')
+      .eq('record_date', prevDate).eq('entity_type','equipment');
+    if (error || !data?.length) { show('אין נתוני ציוד ליום הקודם','error'); return; }
+    const inserts = data.map(r => ({
+      record_date: selectedDate, entity_type: 'equipment',
+      entity_id: r.entity_id, status: r.status, notes: r.notes||''
+    }));
+    const { error: err2 } = await supabase.from('daily_status').upsert(inserts,
+      { onConflict: 'record_date,entity_type,entity_id' });
+    if (err2) { show('שגיאה בהעתקה','error'); return; }
+    show('הועתק מיום קודם ✓');
+    load();
+  }
+
+  // Status color helper — status values are English (present, weekend, vacation, etc.)
+  function empStatusStyle(status) {
+    const opt = ATTENDANCE_OPTIONS.find(o=>o.value===status);
+    return opt ? {background:opt.bg, color:opt.color, border:`1px solid ${opt.color}33`}
+               : {background:'#f5f5f4',color:'#78716c',border:'1px solid #e7e5e4'};
+  }
+  function eqStatusStyle(status) {
+    const opt = EQUIPMENT_OPTIONS.find(o=>o.value===status);
+    return opt ? {background:opt.bg, color:opt.color, border:`1px solid ${opt.color}33`}
+               : {background:'#f5f5f4',color:'#78716c',border:'1px solid #e7e5e4'};
+  }
+
+  const ROLE_LABEL = {operator:'מפעיל',driver:'נהג',mechanic:'מכונאי',supervisor:'מפקח',manager:'מנהל',other:'אחר'};
+
+  return (
+    <div>
+      <Toast toast={toast}/>
+
+      {/* Header */}
+      <div className="page-header">
+        <div>
+          <h2>נוכחות וזמינות</h2>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {dayConfirmed ? (
+            <span style={{background:'#dcfce7',color:'#16a34a',border:'1px solid #16a34a44',
+                          borderRadius:20,padding:'6px 16px',fontSize:13,fontWeight:700}}>
+              ✅ יום מאושר
+            </span>
+          ) : (
+            <button className="btn btn-primary" onClick={confirmDay} disabled={confirming}
+              style={{background:'#16a34a',borderColor:'#16a34a'}}>
+              {confirming ? 'שומר...' : '✅ אשר יום'}
+            </button>
+          )}
+          <button className="btn btn-outline"
+            onClick={()=>{ const d=new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().slice(0,10)); }}
+            style={{fontSize:18,padding:'6px 14px'}}>›</button>
+          <div style={{
+            background: isWeekend(selectedDate) ? '#fef3c7' : 'var(--primary-light)',
+            border: `2px solid ${isWeekend(selectedDate) ? '#d97706' : 'var(--primary)'}`,
+            borderRadius:12, padding:'8px 20px', textAlign:'center', minWidth:200
+          }}>
+            <div style={{fontSize:20,fontWeight:700,color: isWeekend(selectedDate) ? '#d97706' : 'var(--primary-dark)'}}>
+              {formatDateHe(selectedDate)}
+            </div>
+            {isWeekend(selectedDate) && <div style={{fontSize:12,color:'#d97706',fontWeight:600}}>🔶 סוף שבוע</div>}
+          </div>
+          <button className="btn btn-outline"
+            onClick={()=>setSelectedDate(new Date().toISOString().slice(0,10))}
+            style={{fontSize:13}}>היום</button>
+          <button className="btn btn-outline"
+            onClick={()=>{ const d=new Date(selectedDate); d.setDate(d.getDate()+1); setSelectedDate(d.toISOString().slice(0,10)); }}
+            style={{fontSize:18,padding:'6px 14px'}}>‹</button>
+          <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)}
+            style={{border:'1px solid var(--border)',borderRadius:8,padding:'6px 10px',fontSize:13,cursor:'pointer'}}/>
+        </div>
+      </div>
+
+      {loading ? <div className="loading"><div className="spinner"></div> טוען...</div> : (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+
+          {/* ── EQUIPMENT ── */}
+          <div className="table-card">
+            <div className="table-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <h3>🏗️ זמינות כלים ({equipment.length})</h3>
+              <button className="btn btn-outline btn-sm" onClick={copyFromYesterday} title="העתק סטטוס מיום קודם">
+                העתק מאתמול
+              </button>
+            </div>
+            <div style={{padding:'8px 0'}}>
+              {equipment.map(eq => {
+                const key = `equipment:${eq.id}`;
+                const rec = statusMap[key];
+                const status = rec?.status || '';
+                const notes = rec?.notes || '';
+                const isOpen = openNotes === key;
+                return (
+                  <div key={eq.id} style={{padding:'10px 16px',borderBottom:'1px solid var(--border)'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      {/* Name + type */}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:14}}>{eq.mia_number ? `${eq.mia_number} — ` : ''}{eq.name}</div>
+                        <div style={{fontSize:11,color:'var(--text-muted)'}}>{eq.equipment_number}{eq.dedicated_type ? ' • '+eq.dedicated_type : ''}</div>
+                      </div>
+                      {/* Status dropdown */}
+                      <select
+                        value={status}
+                        onChange={e=>saveEquipmentStatus(eq.id,e.target.value,notes)}
+                        style={{...eqStatusStyle(status), borderRadius:20, padding:'4px 10px',
+                                fontSize:13, fontFamily:'inherit', cursor:'pointer', fontWeight:600,
+                                minWidth:90, textAlign:'center'}}>
+                        {EQUIPMENT_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                      {/* Notes toggle */}
+                      <button
+                        onClick={()=>{ setOpenNotes(isOpen?null:key); setNotesDraft(notes); }}
+                        style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
+                                padding:'4px 8px',cursor:'pointer',fontSize:12,color:notes?'var(--primary)':'var(--text-muted)'}}>
+                        {notes ? '📝' : 'הערה'}
+                      </button>
+                    </div>
+                    {/* Notes field */}
+                    {isOpen && (
+                      <div style={{marginTop:8,display:'flex',gap:6}}>
+                        <input value={notesDraft} onChange={e=>setNotesDraft(e.target.value)}
+                          placeholder="הערה..."
+                          style={{flex:1,padding:'6px 10px',border:'1px solid var(--border)',borderRadius:6,
+                                  fontSize:13,fontFamily:'inherit',direction:'rtl'}}/>
+                        <button className="btn btn-primary btn-sm"
+                          onClick={()=>{ saveEquipmentStatus(eq.id,status,notesDraft); setOpenNotes(null); }}>
+                          שמור
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {equipment.length===0 && <p style={{padding:16,color:'var(--text-muted)',fontSize:13}}>אין כלים פעילים</p>}
+            </div>
+          </div>
+
+          {/* ── EMPLOYEES ── */}
+          <div className="table-card">
+            <div className="table-header">
+              <h3>👷 נוכחות עובדים ({employees.length})</h3>
+              {isWeekend(selectedDate) && (
+                <span style={{fontSize:12,color:'var(--primary)',fontWeight:600}}>סוף שבוע — ברירת מחדל: סופ"ש</span>
+              )}
+            </div>
+            <div style={{padding:'8px 0'}}>
+              {employees.map(emp => {
+                const key = `employee:${emp.id}`;
+                const rec = statusMap[key];
+                const status = rec?.status || '';
+                const notes = rec?.notes || '';
+                const isOpen = openNotes === key;
+                const statusOpt = ATTENDANCE_OPTIONS.find(o=>o.value===status);
+                return (
+                  <div key={emp.id} style={{padding:'10px 16px',borderBottom:'1px solid var(--border)'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      {/* Avatar */}
+                      <div style={{width:34,height:34,borderRadius:'50%',
+                                   background:'linear-gradient(135deg,var(--primary),#d97706)',
+                                   display:'flex',alignItems:'center',justifyContent:'center',
+                                   color:'white',fontWeight:700,fontSize:14,flexShrink:0}}>
+                        {emp.full_name?.[0]}
+                      </div>
+                      {/* Name + role */}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:14}}>{emp.mia_number_new ? `${emp.mia_number_new} — ` : ''}{emp.full_name}</div>
+                        <div style={{fontSize:11,color:'var(--text-muted)'}}>{ROLE_LABEL[emp.role]||emp.role||''}</div>
+                      </div>
+                      {/* Status dropdown */}
+                      <select
+                        value={status}
+                        onChange={e=>saveEmployeeStatus(emp.id,e.target.value,notes)}
+                        style={{...empStatusStyle(status), borderRadius:20, padding:'4px 10px',
+                                fontSize:13, fontFamily:'inherit', cursor:'pointer', fontWeight:600,
+                                minWidth:110, textAlign:'center'}}>
+                        {ATTENDANCE_OPTIONS.map(o=>(
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                      {/* Notes toggle */}
+                      <button
+                        onClick={()=>{ setOpenNotes(isOpen?null:key); setNotesDraft(notes); }}
+                        style={{background:'none',border:'1px solid var(--border)',borderRadius:6,
+                                padding:'4px 8px',cursor:'pointer',fontSize:12,color:notes?'var(--primary)':'var(--text-muted)'}}>
+                        {notes ? '📝' : 'הערה'}
+                      </button>
+                    </div>
+                    {/* Notes field */}
+                    {isOpen && (
+                      <div style={{marginTop:8,display:'flex',gap:6}}>
+                        <input value={notesDraft} onChange={e=>setNotesDraft(e.target.value)}
+                          placeholder="הערה..."
+                          style={{flex:1,padding:'6px 10px',border:'1px solid var(--border)',borderRadius:6,
+                                  fontSize:13,fontFamily:'inherit',direction:'rtl'}}/>
+                        <button className="btn btn-primary btn-sm"
+                          onClick={()=>{ saveEmployeeStatus(emp.id,status,notesDraft); setOpenNotes(null); }}>
+                          שמור
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {employees.length===0 && <p style={{padding:16,color:'var(--text-muted)',fontSize:13}}>אין עובדים פעילים</p>}
+            </div>
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CALENDAR PAGE — monthly/weekly view of orders + equipment availability
+// ══════════════════════════════════════════════════════════════════════════════
+function CalendarPage() {
+  const { toast, show } = useToast();
+
+  const today = new Date();
+  const [viewDate, setViewDate] = useState(today); // which month/week we're viewing
+  const [viewMode, setViewMode] = useState('month'); // 'month' | 'week'
+  const [orders, setOrders] = useState([]);
+  const [equipment, setEquipment] = useState([]);
+  const [dailyStatus, setDailyStatus] = useState({}); // { [date]: [{entity_id, status}] }
+  const [selectedDay, setSelectedDay] = useState(null); // date string 'YYYY-MM-DD'
+  const [loading, setLoading] = useState(true);
+
+  // Status colors for orders
+  const statusColors = {
+    'ממתין':  { bg:'#fef9c3', text:'#854d0e', border:'#fde047' },
+    'מאושר':  { bg:'#dcfce7', text:'#15803d', border:'#86efac' },
+    'בביצוע': { bg:'#dbeafe', text:'#1d4ed8', border:'#93c5fd' },
+    'הושלם':  { bg:'#f3f4f6', text:'#374151', border:'#d1d5db' },
+    'בוטל':   { bg:'#fee2e2', text:'#b91c1c', border:'#fca5a5' },
+    'נדחה':   { bg:'#fce7f3', text:'#9d174d', border:'#f9a8d4' },
+  };
+
+  function statusStyle(status) {
+    return statusColors[status] || { bg:'#f3f4f6', text:'#374151', border:'#d1d5db' };
+  }
+
+  // Determine date range to fetch (month view: full month; week view: the week)
+  function getRange() {
+    if (viewMode === 'month') {
+      const start = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+      const end   = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0);
+      return [fmtDate(start), fmtDate(end)];
+    } else {
+      const d = new Date(viewDate);
+      // start of week (Sunday)
+      const day = d.getDay(); // 0=Sun
+      const sun = new Date(d); sun.setDate(d.getDate() - day);
+      const sat = new Date(sun); sat.setDate(sun.getDate() + 6);
+      return [fmtDate(sun), fmtDate(sat)];
+    }
+  }
+
+  // Local date string — avoids UTC shift (Israel UTC+3 means toISOString gives yesterday)
+  function fmtDate(d) {
+    const y = d.getFullYear();
+    const mo = String(d.getMonth()+1).padStart(2,'0');
+    const dy = String(d.getDate()).padStart(2,'0');
+    return `${y}-${mo}-${dy}`;
+  }
+
+  // Load orders and equipment status for visible range
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [start, end] = getRange();
+    const [ord, eq, ds] = await Promise.all([
+      // orders that overlap the range
+      supabase.from('orders')
+        .select('id,order_number_display,client_name,equipment_id,equipment_name,mia_number,is_external_equipment,equipment_type,equipment_size,supplier_name,start_date,end_date,status,location,description,equipment:equipment_id(mia_number,name),order_operators(employee_name)')
+        .lte('start_date', end)
+        .gte('end_date', start)
+        .not('status','eq','בוטל'),
+      // all active equipment
+      supabase.from('equipment').select('id,name,mia_number,dedicated_type').eq('equipment_status','active').order('name'),
+      // daily_status for the range
+      supabase.from('daily_status').select('record_date,entity_id,status').gte('record_date',start).lte('record_date',end),
+    ]);
+    setOrders(ord.data || []);
+    setEquipment(eq.data || []);
+    // Group daily_status by date
+    const grouped = {};
+    (ds.data||[]).forEach(r => {
+      if (!grouped[r.record_date]) grouped[r.record_date] = [];
+      grouped[r.record_date].push(r);
+    });
+    setDailyStatus(grouped);
+    setLoading(false);
+  }, [viewDate, viewMode]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Orders active on a given date
+  function ordersOnDate(dateStr) {
+    return orders.filter(o => o.start_date <= dateStr && o.end_date >= dateStr);
+  }
+
+  // Equipment status on a given date
+  function equipmentOnDate(dateStr) {
+    const statusToday = dailyStatus[dateStr] || [];
+    const statusMap = Object.fromEntries(statusToday.map(s=>[s.entity_id, s.status]));
+    // Orders on this date → which equipment is assigned
+    const assignedEquipIds = new Set(
+      ordersOnDate(dateStr).filter(o=>o.equipment_id).map(o=>o.equipment_id)
+    );
+    return equipment.map(eq => {
+      const rawStatus = statusMap[eq.id];
+      let displayStatus;
+      if (assignedEquipIds.has(eq.id)) {
+        displayStatus = 'משובץ';
+      } else if (rawStatus) {
+        displayStatus = rawStatus;
+      } else {
+        displayStatus = 'זמין'; // default if no record
+      }
+      // Find order for this equipment on this date
+      const order = ordersOnDate(dateStr).find(o=>o.equipment_id===eq.id);
+      return { ...eq, status: displayStatus, order };
+    });
+  }
+
+  // Navigation
+  function prev() {
+    const d = new Date(viewDate);
+    if (viewMode==='month') d.setMonth(d.getMonth()-1);
+    else d.setDate(d.getDate()-7);
+    setViewDate(d);
+    setSelectedDay(null);
+  }
+  function next() {
+    const d = new Date(viewDate);
+    if (viewMode==='month') d.setMonth(d.getMonth()+1);
+    else d.setDate(d.getDate()+7);
+    setViewDate(d);
+    setSelectedDay(null);
+  }
+  function goToday() { setViewDate(new Date()); setSelectedDay(fmtDate(new Date())); }
+
+  // Month view: build grid of weeks
+  function buildMonthGrid() {
+    const year = viewDate.getFullYear(), month = viewDate.getMonth();
+    const first = new Date(year, month, 1);
+    const last  = new Date(year, month+1, 0);
+    const startDay = first.getDay(); // 0=Sun
+    const days = [];
+    // fill leading empty
+    for (let i=0; i<startDay; i++) days.push(null);
+    for (let d=1; d<=last.getDate(); d++) {
+      days.push(new Date(year, month, d));
+    }
+    // fill trailing empty to complete last row
+    while (days.length % 7 !== 0) days.push(null);
+    return days;
+  }
+
+  // Week view: 7 days starting from Sunday of current week
+  function buildWeekDays() {
+    const d = new Date(viewDate);
+    const day = d.getDay();
+    const sun = new Date(d); sun.setDate(d.getDate()-day);
+    return Array.from({length:7}, (_,i) => { const x=new Date(sun); x.setDate(sun.getDate()+i); return x; });
+  }
+
+  const hebrewDays = ['א\'','ב\'','ג\'','ד\'','ה\'','ו\'','ש\''];
+  const hebrewMonths = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+
+  function DayCell({ date }) {
+    if (!date) return <div style={{background:'#fafaf9',borderRadius:8,minHeight:100}} />;
+    const ds = fmtDate(date);
+    const dayOrders = ordersOnDate(ds);
+    const isToday = ds === fmtDate(today);
+    const isSelected = ds === selectedDay;
+    const isWeekday = date.getDay()===5||date.getDay()===6; // Fri/Sat = weekend in IL
+    return (
+      <div
+        onClick={()=>setSelectedDay(ds===selectedDay?null:ds)}
+        style={{
+          background: isSelected ? '#fff7ed' : isWeekday ? '#fafaf9' : 'white',
+          border: isSelected ? '2px solid var(--primary)' : isToday ? '2px solid #f97316' : '1px solid var(--border)',
+          borderRadius:8, minHeight:100, padding:'6px 8px', cursor:'pointer',
+          transition:'all 0.15s',
+        }}
+      >
+        {/* Day number */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+          <span style={{
+            fontWeight: isToday?700:500, fontSize:13,
+            color: isToday ? 'white' : isWeekday ? '#a8a29e' : '#1c1917',
+            background: isToday ? 'var(--primary)' : 'transparent',
+            borderRadius:'50%', width:22, height:22,
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>{date.getDate()}</span>
+          {dayOrders.length>0 && (
+            <span style={{fontSize:10,color:'#78716c'}}>{dayOrders.length} הזמנות</span>
+          )}
+        </div>
+        {/* Order chips — show up to 3 */}
+        {dayOrders.slice(0,3).map(o=>{
+          const s=statusStyle(o.status);
+          // Show mia_number + name for internal, supplier info for external
+          // Build label: prefer joined equipment row, fallback to stored equipment_name field
+          const miaNum  = o.equipment?.mia_number || o.mia_number || '';
+          const eqName  = o.equipment?.name || o.equipment_name || '';
+          const chipLabel = o.is_external_equipment
+            ? [o.supplier_name, o.equipment_size].filter(Boolean).join(' - ') || o.equipment_type || o.order_number_display
+            : [miaNum, eqName].filter(Boolean).join(' - ') || o.order_number_display;
+          return (
+            <div key={o.id} style={{
+              background:s.bg, color:s.text, border:`1px solid ${s.border}`,
+              borderRadius:4, padding:'2px 5px', fontSize:10, marginBottom:2,
+              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+            }}>
+              {chipLabel}
+            </div>
+          );
+        })}
+        {dayOrders.length>3 && (
+          <div style={{fontSize:10,color:'var(--primary)',fontWeight:600}}>+{dayOrders.length-3} נוספות</div>
+        )}
+      </div>
+    );
+  }
+
+  // Side panel for selected day
+  function DayPanel({ dateStr }) {
+    const dayOrders = ordersOnDate(dateStr);
+    const eqList = equipmentOnDate(dateStr);
+    const available = eqList.filter(e=>e.status==='זמין');
+    const assigned  = eqList.filter(e=>e.status==='משובץ');
+    const other     = eqList.filter(e=>e.status!=='זמין'&&e.status!=='משובץ');
+
+    const d = new Date(dateStr);
+    const dayLabel = `${hebrewDays[d.getDay()]} ${d.getDate()} ב${hebrewMonths[d.getMonth()]}`;
+
+    function eqBadge(status) {
+      if (status==='זמין')   return {bg:'#dcfce7',text:'#15803d'};
+      if (status==='משובץ')  return {bg:'#dbeafe',text:'#1d4ed8'};
+      return {bg:'#f3f4f6',text:'#374151'};
+    }
+
+    return (
+      <div style={{
+        background:'white', borderRadius:14, border:'1px solid var(--border)',
+        padding:16, position:'sticky', top:24,
+      }}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <h3 style={{fontSize:15,fontWeight:700}}>{dayLabel}</h3>
+          <button onClick={()=>setSelectedDay(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:'#78716c'}}>×</button>
+        </div>
+
+        {/* Orders section */}
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:'#1c1917',marginBottom:8,paddingBottom:6,borderBottom:'2px solid var(--primary)'}}>
+            📋 הזמנות ({dayOrders.length})
+          </div>
+          {dayOrders.length===0 ? (
+            <div style={{fontSize:12,color:'#a8a29e',padding:'8px 0'}}>אין הזמנות ביום זה</div>
+          ) : dayOrders.map(o=>{
+            const s=statusStyle(o.status);
+            // For external equipment: show "supplier - size", for internal: equipment name
+            const panelMia  = o.equipment?.mia_number || o.mia_number || '';
+            const panelName = o.equipment?.name || o.equipment_name || '';
+            const eqName = o.is_external_equipment
+              ? [o.supplier_name, o.equipment_size].filter(Boolean).join(' - ') || o.equipment_type || '(חיצוני)'
+              : [panelMia, panelName].filter(Boolean).join(' - ') || '';
+            return (
+              <div key={o.id} style={{
+                border:`1px solid ${s.border}`, borderRadius:8,
+                padding:'8px 10px', marginBottom:8, background:s.bg,
+              }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontWeight:600,fontSize:13}}>{o.order_number_display}</span>
+                  <span style={{fontSize:11,color:s.text,fontWeight:600}}>{o.status}</span>
+                </div>
+                <div style={{fontSize:12,color:'#57534e',marginTop:2}}>{o.client_name}</div>
+                {eqName && (
+                  <div style={{fontSize:12,color:'#78716c',display:'flex',alignItems:'center',gap:4}}>
+                    🏗️ {eqName}
+                    {o.is_external_equipment && <span style={{fontSize:10,background:'#fef3c7',color:'#92400e',padding:'1px 5px',borderRadius:4,fontWeight:600}}>חיצוני</span>}
+                  </div>
+                )}
+                {o.location && <div style={{fontSize:11,color:'#78716c'}}>📍 {o.location}</div>}
+                {o.description && <div style={{fontSize:11,color:'#57534e',marginTop:3,borderTop:'1px solid rgba(0,0,0,0.06)',paddingTop:3}}>{o.description}</div>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Assigned equipment shown inside orders above — no separate section needed */}
+
+        {available.length>0 && (
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#15803d',marginBottom:8,paddingBottom:6,borderBottom:'2px solid #86efac'}}>🟢 כלים זמינים ({available.length})</div>
+            {available.map(eq=>(
+              <div key={eq.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 8px',background:'#f0fdf4',borderRadius:6,marginBottom:4}}>
+                <span style={{fontSize:12,fontWeight:500}}>{eq.name}{eq.mia_number ? ` מי"ה ${eq.mia_number}` : ''}</span>
+                <span style={{fontSize:10,background:'#dcfce7',color:'#15803d',padding:'2px 6px',borderRadius:4,fontWeight:600}}>זמין</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {other.length>0 && (
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:'#78716c',marginBottom:8,paddingBottom:6,borderBottom:'2px solid #d1d5db'}}>⚪ כלים פנויים ({other.length})</div>
+            {other.map(eq=>(
+              <div key={eq.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 8px',background:'#f5f5f4',borderRadius:6,marginBottom:4}}>
+                <span style={{fontSize:12,fontWeight:500}}>{eq.name}{eq.mia_number ? ` מי"ה ${eq.mia_number}` : ''}</span>
+                <span style={{fontSize:10,background:'#e7e5e4',color:'#57534e',padding:'2px 6px',borderRadius:4,fontWeight:600}}>{eq.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const monthDays = buildMonthGrid();
+  const weekDays  = buildWeekDays();
+
+  const titleLabel = viewMode==='month'
+    ? `${hebrewMonths[viewDate.getMonth()]} ${viewDate.getFullYear()}`
+    : `שבוע ${fmtDate(weekDays[0])} – ${fmtDate(weekDays[6])}`;
+
+  return (
+    <div>
+      {toast}
+      {/* Header */}
+      <div className="page-header">
+        <div>
+          <h2>📅 לוח שנה</h2>
+          <p style={{color:'var(--text-muted)',fontSize:13}}>הזמנות וזמינות כלים</p>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <button className="btn btn-outline btn-sm" onClick={goToday}>היום</button>
+          <div style={{display:'flex',border:'1px solid var(--border)',borderRadius:8,overflow:'hidden'}}>
+            {['month','week'].map(m=>(
+              <button key={m} onClick={()=>{setViewMode(m);setSelectedDay(null);}} style={{
+                padding:'6px 12px',fontSize:13,border:'none',cursor:'pointer',
+                background:viewMode===m?'var(--primary)':'white',
+                color:viewMode===m?'white':'var(--text)',fontWeight:viewMode===m?600:400,
+              }}>{m==='month'?'חודשי':'שבועי'}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:selectedDay?'1fr 300px':'1fr',gap:16,alignItems:'start'}}>
+        {/* Calendar */}
+        <div style={{background:'white',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden'}}>
+          {/* Nav bar */}
+          <div style={{
+            background:'var(--primary)',color:'white',
+            display:'flex',justifyContent:'space-between',alignItems:'center',
+            padding:'14px 20px',
+          }}>
+            <button onClick={next} style={{background:'none',border:'none',color:'white',fontSize:20,cursor:'pointer'}}>›</button>
+            <span style={{fontWeight:700,fontSize:17}}>{titleLabel}</span>
+            <button onClick={prev} style={{background:'none',border:'none',color:'white',fontSize:20,cursor:'pointer'}}>‹</button>
+          </div>
+
+          {/* Day headers */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,padding:'8px 8px 4px'}}>
+            {hebrewDays.map(d=>(
+              <div key={d} style={{textAlign:'center',fontSize:12,fontWeight:600,color:'#78716c',padding:'4px 0'}}>{d}</div>
+            ))}
+          </div>
+
+          {/* Month grid */}
+          {viewMode==='month' && (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,padding:'0 8px 8px'}}>
+              {monthDays.map((d,i)=><DayCell key={i} date={d} />)}
+            </div>
+          )}
+
+          {/* Week grid */}
+          {viewMode==='week' && (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,padding:'0 8px 8px'}}>
+              {weekDays.map((d,i)=>(
+                <div key={i} style={{minHeight:300}}>
+                  <DayCell date={d} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {loading && (
+            <div style={{textAlign:'center',padding:16,color:'#78716c',fontSize:13}}>טוען...</div>
+          )}
+        </div>
+
+        {/* Day panel */}
+        {selectedDay && <DayPanel dateStr={selectedDay} />}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SETTINGS PAGE — manage lookup lists (license types, etc.)
+// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// SCHEDULE PAGE — weekly operator assignment grid
+// ══════════════════════════════════════════════════════════════════════════════
+function SchedulePage() {
+  const { toast, show } = useToast();
+
+  const today = new Date();
+
+  // Start from Sunday of current week
+  function sundayOf(d) {
+    const x = new Date(d);
+    x.setDate(x.getDate() - x.getDay());
+    x.setHours(0,0,0,0);
+    return x;
+  }
+
+  const [weekStart, setWeekStart] = useState(sundayOf(today));
+  const [employees, setEmployees] = useState([]);
+  const [assignments, setAssignments] = useState({});
+  const [attendance, setAttendance] = useState({});
+  const [externalRows, setExternalRows] = useState([]);
+  const [equipmentLicenses, setEquipmentLicenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Use local date string to avoid UTC shift (Israel = UTC+3)
+  function fmtDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function weekDays() {
+    return Array.from({length:7}, (_,i) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      return d;
+    });
+  }
+
+  const days = weekDays();
+  const startStr = fmtDate(days[0]);
+  const endStr   = fmtDate(days[6]);
+
+  const hebrewDayShort = ['א\'','ב\'','ג\'','ד\'','ה\'','ו\'','ש\''];
+  const hebrewMonths   = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [empRes, ordRes, attRes, extRes, licRes] = await Promise.all([
+      // active employees
+      supabase.from('employees').select('id,full_name,role').eq('employee_status','active').order('full_name'),
+      // orders that overlap this week (not cancelled), with their operators
+      supabase.from('orders')
+        .select('id,order_number_display,equipment_id,equipment_name,mia_number,start_date,end_date,status,equipment:equipment_id(mia_number,name),order_operators(employee_id,employee_name)')
+        .lte('start_date', endStr)
+        .gte('end_date', startStr)
+        .not('status','eq','בוטל'),
+      // attendance for the week
+      supabase.from('employee_daily_status')
+        .select('employee_id,record_date,status')
+        .gte('record_date', startStr)
+        .lte('record_date', endStr),
+      // external equipment orders for this week
+      supabase.from('orders')
+        .select('id,order_number_display,start_date,end_date,status,supplier_name,equipment_type,equipment_size')
+        .eq('is_external_equipment', true)
+        .lte('start_date', endStr)
+        .gte('end_date', startStr)
+        .not('status','eq','בוטל'),
+      // equipment licenses table
+      supabase.from('equipment')
+        .select('id,name,mia_number,equipment_number,license_date,inspector_date,transport_license_date')
+        .not('equipment_status','eq','נמכר')
+        .order('name'),
+    ]);
+
+    setEmployees(empRes.data || []);
+
+    // Build assignments map: { 'empId|date': [{mia, name}, ...] }
+    const asgn = {};
+    (ordRes.data || []).forEach(o => {
+      (o.order_operators || []).forEach(op => {
+        days.forEach(d => {
+          const ds = fmtDate(d);
+          if (ds >= o.start_date && ds <= o.end_date) {
+            const key = `${op.employee_id}|${ds}`;
+            if (!asgn[key]) asgn[key] = [];
+            const mia  = o.equipment?.mia_number || o.mia_number || '';
+            const name = o.equipment?.name || o.equipment_name || '';
+            // Avoid duplicates by mia+name combo
+            if (!asgn[key].some(x => x.mia===String(mia) && x.name===name))
+              asgn[key].push({ mia: String(mia), name });
+          }
+        });
+      });
+    });
+    setAssignments(asgn);
+
+    // Build external rows: group by supplier_name
+    // Each unique supplier gets a "row", cells show equipment_size on active dates
+    const extMap = {}; // { supplier_name: { date: [size, ...] } }
+    (extRes.data || []).forEach(o => {
+      const supplier = o.supplier_name || 'ספק חיצוני';
+      if (!extMap[supplier]) extMap[supplier] = {};
+      days.forEach(d => {
+        const ds = fmtDate(d);
+        if (ds >= o.start_date && ds <= o.end_date) {
+          if (!extMap[supplier][ds]) extMap[supplier][ds] = [];
+          const label = [o.equipment_size, o.equipment_type].filter(Boolean).join(' ') || o.order_number_display;
+          if (!extMap[supplier][ds].includes(label)) extMap[supplier][ds].push(label);
+        }
+      });
+    });
+    setExternalRows(Object.entries(extMap).map(([supplier, dates]) => ({ supplier, dates })));
+    setEquipmentLicenses(licRes.data || []);
+
+    // Build attendance map: { 'empId|date': status }
+    const att = {};
+    (attRes.data || []).forEach(r => {
+      att[`${r.employee_id}|${r.record_date}`] = r.status;
+    });
+    setAttendance(att);
+
+    setLoading(false);
+  }, [weekStart]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function prevWeek() { const d=new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }
+  function nextWeek() { const d=new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }
+  function goToday()  { setWeekStart(sundayOf(today)); }
+
+  // Translate English DB values to Hebrew display
+  const ATT_HE = {
+    'present':      'נוכח',
+    'vacation':     'חופש',
+    'sick':         'מחלה',
+    'reserve_duty': 'מילואים',
+    'training':     'הדרכה',
+    'other':        'אחר',
+    'weekend':      'סופ"ש',
+  };
+  function attHe(status) { return ATT_HE[status] || status || ''; }
+
+  // Status badge style
+  function attStyle(status) {
+    const he = attHe(status);
+    const map = {
+      'נוכח':    { bg:'#f0fdf4', text:'#15803d', border:'#86efac' },
+      'סופ"ש':  { bg:'#e7e5e4', text:'#78716c', border:'#d6d3d1' },
+      'חופש':   { bg:'#eff6ff', text:'#1d4ed8', border:'#93c5fd' },
+      'מחלה':   { bg:'#fef2f2', text:'#b91c1c', border:'#fca5a5' },
+      'מילואים':{ bg:'#fefce8', text:'#854d0e', border:'#fde047' },
+      'הדרכה':  { bg:'#fdf4ff', text:'#7e22ce', border:'#d8b4fe' },
+      'אחר':    { bg:'#f5f5f4', text:'#57534e', border:'#d6d3d1' },
+    };
+    return map[he] || { bg:'#f5f5f4', text:'#57534e', border:'#d6d3d1' };
+  }
+
+  const weekLabel = `${days[0].getDate()}/${days[0].getMonth()+1} – ${days[6].getDate()}/${days[6].getMonth()+1}/${days[6].getFullYear()}`;
+
+  // Legend items
+  const legend = [
+    { label:'מס\' כלי',              bg:'#dcfce7', text:'#15803d' },
+    { label:'משובץ להזמנה מאושרת',   bg:'#dbeafe', text:'#1d4ed8' },
+    { label:'חופש',                  bg:'#eff6ff', text:'#1d4ed8' },
+    { label:'מילואים',               bg:'#fefce8', text:'#854d0e' },
+    { label:'מחלה',                  bg:'#fef2f2', text:'#b91c1c' },
+    { label:'הדרכה',                 bg:'#fdf4ff', text:'#7e22ce' },
+    { label:'סופ"ש',                 bg:'#f5f5f4', text:'#78716c' },
+    { label:'אחר',                   bg:'#f5f5f4', text:'#57534e' },
+    { label:'פנוי / נוכח',           bg:'white',   text:'#78716c', dash:true },
+  ];
+
+  // Format date for display: DD/MM/YYYY, red if expired, orange if within 30 days
+  function fmtLicDate(dateStr) {
+    if (!dateStr) return { label:'—', color:'#a8a29e', expired:false };
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = (d - now) / (1000*60*60*24);
+    const label = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    if (diff < 0)  return { label, color:'#dc2626', expired:true };   // expired — red
+    if (diff < 30) return { label, color:'#d97706', expired:false };  // soon — orange
+    return { label, color:'#15803d', expired:false };                 // ok — green
+  }
+
+  // TV-optimized sizes
+  const TV = { headerFontSize:18, cellFontSize:16, nameFontSize:17, rowHeight:56, badgeFontSize:14, badgePad:'6px 14px' };
+
+  return (
+    <div style={{fontSize:TV.cellFontSize}}>
+      {toast}
+
+      {/* ── Header ── */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+        <div>
+          <h2 style={{fontSize:26,fontWeight:800}}>👷 לוח שיבוץ שבועי</h2>
+          <p style={{color:'var(--text-muted)',fontSize:15}}>שיבוץ עובדים לפי שבוע</p>
+        </div>
+        <div style={{display:'flex',gap:10,alignItems:'center'}}>
+          <button className="btn btn-outline" onClick={goToday} style={{fontSize:15,padding:'8px 18px'}}>השבוע</button>
+          <div style={{display:'flex',alignItems:'center',gap:6,border:'2px solid var(--border)',borderRadius:10,padding:'6px 16px',background:'white',fontSize:16,fontWeight:600}}>
+            <button onClick={prevWeek} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'var(--primary)',lineHeight:1}}>‹</button>
+            <span style={{minWidth:200,textAlign:'center'}}>{weekLabel}</span>
+            <button onClick={nextWeek} style={{background:'none',border:'none',cursor:'pointer',fontSize:22,color:'var(--primary)',lineHeight:1}}>›</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Assignment grid ── */}
+      <div style={{background:'white',borderRadius:16,border:'2px solid var(--border)',overflowX:'auto',marginBottom:24}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead>
+            <tr>
+              <th style={{
+                padding:'14px 20px',textAlign:'right',fontSize:TV.headerFontSize,fontWeight:700,
+                background:'#f5f5f4',borderBottom:'2px solid var(--border)',
+                position:'sticky',right:0,zIndex:2,minWidth:160,
+              }}>👤 עובד</th>
+              {days.map(d => {
+                const isToday = fmtDate(d)===fmtDate(today);
+                const isWknd  = d.getDay()===5||d.getDay()===6;
+                return (
+                  <th key={fmtDate(d)} style={{
+                    padding:'10px 6px',textAlign:'center',fontSize:TV.headerFontSize,fontWeight:700,
+                    background: isToday ? 'var(--primary)' : isWknd ? '#e7e5e4' : '#f5f5f4',
+                    color: isToday ? 'white' : isWknd ? '#78716c' : '#1c1917',
+                    borderBottom:'2px solid var(--border)',minWidth:110,
+                  }}>
+                    <div style={{fontSize:15}}>{hebrewDayShort[d.getDay()]}</div>
+                    <div style={{fontSize:TV.headerFontSize+2,fontWeight:800}}>{d.getDate()}/{d.getMonth()+1}</div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={8} style={{padding:32,textAlign:'center',color:'#78716c',fontSize:18}}>טוען...</td></tr>
+            ) : employees.map((emp, ri) => (
+              <tr key={emp.id} style={{background:ri%2===0?'white':'#fafaf9',height:TV.rowHeight}}>
+                <td style={{
+                  padding:'8px 20px',fontSize:TV.nameFontSize,fontWeight:600,
+                  borderBottom:'1px solid #e7e5e4',
+                  position:'sticky',right:0,background:ri%2===0?'white':'#fafaf9',zIndex:1,
+                }}>
+                  {emp.full_name}
+                  {emp.role && <div style={{fontSize:12,color:'#a8a29e',fontWeight:400}}>{emp.role}</div>}
+                </td>
+                {days.map(d => {
+                  const ds   = fmtDate(d);
+                  const key  = `${emp.id}|${ds}`;
+                  const asgn = assignments[key];
+                  const att  = attendance[key];
+                  const isWknd = d.getDay()===5||d.getDay()===6;
+                  const cellBg = isWknd ? '#ede9e8' : undefined;
+                  const attLabel = attHe(att); // translate to Hebrew
+
+                  if (asgn && asgn.length > 0) {
+                    // Assigned to equipment order — show name + mia badge
+                    return (
+                      <td key={ds} style={{padding:'4px 6px',borderBottom:'1px solid #e7e5e4',textAlign:'center',background:cellBg}}>
+                        {asgn.map((item,i) => (
+                          <div key={i} style={{
+                            background:'#16a34a',color:'white',
+                            borderRadius:8,padding:'4px 10px',fontSize:TV.badgeFontSize,fontWeight:700,
+                            marginBottom:3,display:'inline-block',lineHeight:1.3,
+                          }}>
+                            {item.name && <div style={{fontSize:TV.badgeFontSize-1}}>{item.name}</div>}
+                            {item.mia  && <div style={{fontSize:TV.badgeFontSize+1}}>מי"ה {item.mia}</div>}
+                          </div>
+                        ))}
+                      </td>
+                    );
+                  } else if (isWknd) {
+                    // Weekend — grey background
+                    return (
+                      <td key={ds} style={{padding:'6px',borderBottom:'1px solid #e7e5e4',textAlign:'center',background:'#ede9e8'}}>
+                        <span style={{fontSize:13,color:'#a8a29e',fontWeight:500}}>סופ"ש</span>
+                      </td>
+                    );
+                  } else if (att && attLabel !== 'נוכח') {
+                    // Absent / special status
+                    const s = attStyle(att);
+                    return (
+                      <td key={ds} style={{padding:'6px',borderBottom:'1px solid #e7e5e4',textAlign:'center'}}>
+                        <span style={{
+                          background:s.bg,color:s.text,border:`2px solid ${s.border}`,
+                          borderRadius:8,padding:TV.badgePad,fontSize:TV.badgeFontSize,fontWeight:600,
+                          display:'inline-block',
+                        }}>{attLabel}</span>
+                      </td>
+                    );
+                  } else if (att === 'present') {
+                    // Explicitly marked present
+                    return (
+                      <td key={ds} style={{padding:'6px',borderBottom:'1px solid #e7e5e4',textAlign:'center'}}>
+                        <span style={{
+                          background:'#f0fdf4',color:'#15803d',border:'2px solid #86efac',
+                          borderRadius:8,padding:TV.badgePad,fontSize:TV.badgeFontSize,fontWeight:600,
+                          display:'inline-block',
+                        }}>נוכח</span>
+                      </td>
+                    );
+                  } else {
+                    // No data — show dash (unknown)
+                    return (
+                      <td key={ds} style={{padding:'6px',borderBottom:'1px solid #e7e5e4',textAlign:'center',color:'#d6d3d1',fontSize:22}}>
+                        —
+                      </td>
+                    );
+                  }
+                })}
+              </tr>
+            ))}
+            {/* External equipment rows */}
+            {externalRows.length > 0 && (
+              <>
+                <tr>
+                  <td colSpan={8} style={{padding:'8px 20px',background:'#fff7ed',fontSize:15,fontWeight:700,color:'var(--primary-dark)',borderTop:'3px solid var(--primary-light)'}}>
+                    🏗️ כלים חיצוניים
+                  </td>
+                </tr>
+                {externalRows.map((row, ri) => (
+                  <tr key={row.supplier} style={{background:ri%2===0?'#fffbf7':'#fff7ed',height:TV.rowHeight}}>
+                    <td style={{
+                      padding:'8px 20px',fontSize:TV.nameFontSize,fontWeight:600,
+                      borderBottom:'1px solid #fed7aa',
+                      position:'sticky',right:0,background:ri%2===0?'#fffbf7':'#fff7ed',zIndex:1,
+                    }}>
+                      {row.supplier}
+                      <div style={{fontSize:12,color:'#a8a29e',fontWeight:400}}>ספק חיצוני</div>
+                    </td>
+                    {days.map(d => {
+                      const ds = fmtDate(d);
+                      const items = row.dates[ds];
+                      const isWknd = d.getDay()===5||d.getDay()===6;
+                      return (
+                        <td key={ds} style={{padding:'6px',borderBottom:'1px solid #fed7aa',textAlign:'center',background:isWknd?'#fef3c7':undefined}}>
+                          {items ? items.map(label => (
+                            <div key={label} style={{
+                              background:'#ea580c',color:'white',
+                              borderRadius:8,padding:TV.badgePad,fontSize:TV.badgeFontSize,fontWeight:700,
+                              marginBottom:3,display:'inline-block',
+                            }}>{label}</div>
+                          )) : <span style={{color:'#d6d3d1',fontSize:22}}>—</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Legend ── */}
+      <div style={{marginBottom:28,display:'flex',flexWrap:'wrap',gap:10,justifyContent:'flex-end',alignItems:'center'}}>
+        {legend.map(l => (
+          <span key={l.label} style={{
+            background:l.bg,color:l.text,
+            border:l.dash?'1px dashed #d6d3d1':`1px solid ${l.bg==='white'?'#e7e5e4':l.bg}`,
+            borderRadius:8,padding:'5px 14px',fontSize:14,fontWeight:500,
+          }}>{l.label}</span>
+        ))}
+        <span style={{color:'#a8a29e',fontSize:14}}>— פנוי / נוכח</span>
+      </div>
+
+      {/* ── Equipment licenses table ── */}
+      <div style={{background:'white',borderRadius:16,border:'2px solid var(--border)',overflow:'hidden'}}>
+        <div style={{background:'#1c1917',padding:'14px 20px',display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:20}}>📋</span>
+          <span style={{color:'white',fontSize:18,fontWeight:700}}>תוקפי רישיונות כלים</span>
+          <span style={{color:'#a8a29e',fontSize:13,marginRight:'auto'}}>🟢 תקף &nbsp; 🟠 פחות מ-30 יום &nbsp; 🔴 פג תוקף</span>
+        </div>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead>
+            <tr style={{background:'#f5f5f4'}}>
+              {['שם כלי','מס\' מי"ה','רישוי','בודק מוסמך','רישיון מוביל'].map(h=>(
+                <th key={h} style={{padding:'12px 16px',textAlign:'right',fontSize:15,fontWeight:700,color:'#1c1917',borderBottom:'2px solid var(--border)'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {equipmentLicenses.map((eq,ri)=>{
+              const lic  = fmtLicDate(eq.license_date);
+              const insp = fmtLicDate(eq.inspector_date);
+              const tran = fmtLicDate(eq.transport_license_date);
+              const rowBg = ri%2===0?'white':'#fafaf9';
+              function Cell({d}){
+                return (
+                  <td style={{padding:'12px 16px',borderBottom:'1px solid #f0ede9',fontSize:TV.cellFontSize}}>
+                    <span style={{
+                      background: d.expired?'#fee2e2': d.color==='#d97706'?'#fef9c3':'#f0fdf4',
+                      color:d.color, fontWeight:700, borderRadius:6, padding:'4px 10px',
+                    }}>{d.label}</span>
+                  </td>
+                );
+              }
+              return (
+                <tr key={eq.id} style={{background:rowBg}}>
+                  <td style={{padding:'12px 16px',fontSize:TV.nameFontSize,fontWeight:600,borderBottom:'1px solid #f0ede9'}}>
+                    {eq.name}
+                    {eq.equipment_number && <span style={{fontSize:12,color:'#78716c',marginRight:6}}>({eq.equipment_number})</span>}
+                  </td>
+                  <td style={{padding:'12px 16px',fontSize:TV.cellFontSize,fontWeight:500,borderBottom:'1px solid #f0ede9',color:'#57534e'}}>
+                    {eq.mia_number||'—'}
+                  </td>
+                  <Cell d={lic}/>
+                  <Cell d={insp}/>
+                  <Cell d={tran}/>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// REPORTS PAGE
+// ══════════════════════════════════════════════════════════════════════════════
+function ReportsPage() {
+  const { toast, show } = useToast();
+
+  // Default date range: first of current month → today
+  function localToday() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function localFirstOfMonth() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+  }
+
+  const [fromDate, setFromDate] = useState(localFirstOfMonth());
+  const [toDate,   setToDate]   = useState(localToday());
+  const [activeTab, setActiveTab] = useState('general');
+  const [orders, setOrders] = useState([]);
+  const [eqByUuidR, setEqByUuidR] = useState({}); // UUID -> equipment row (for reports)
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const TABS = [
+    { id:'general',    label:'דוח כללי',         icon:'📄' },
+    { id:'equip_avail',label:'זמינות כלים',        icon:'🚧' },
+    { id:'equip_sched',label:'שיבוץ כלים',         icon:'📅' },
+    { id:'ops_sched',  label:'שיבוץ מפעילים',      icon:'👷' },
+    { id:'util_pct',   label:'% ניצול כלים',       icon:'📊' },
+    { id:'locations',  label:'מסריצת מיקומים',     icon:'📍' },
+  ];
+
+  // Status badge colors
+  const statusColors = {
+    'ממתין':  { bg:'#fef9c3', text:'#854d0e' },
+    'מאושר':  { bg:'#dcfce7', text:'#15803d' },
+    'בביצוע': { bg:'#dbeafe', text:'#1d4ed8' },
+    'הושלם':  { bg:'#f3f4f6', text:'#374151' },
+    'בוטל':   { bg:'#fee2e2', text:'#b91c1c' },
+    'נדחה':   { bg:'#fce7f3', text:'#9d174d' },
+  };
+  function statusBadge(s) { return statusColors[s] || {bg:'#f3f4f6',text:'#374151'}; }
+
+  // Format date for display
+  function dispDate(d) { return d ? d.replace(/-/g,'/') : '—'; }
+
+  // Load all data for selected date range
+  async function load() {
+    if (!fromDate || !toDate) { show('בחר תאריכים','error'); return; }
+    setLoading(true);
+    setOpLoading(true);
+    const [ordRes, opsRes, eqRes] = await Promise.all([
+      supabase
+        .from('orders')
+        .select('id,order_number_display,client_name,equipment_id,mia_number,equipment_name,is_external_equipment,equipment_type,equipment_size,supplier_name,start_date,end_date,start_time,end_time,status,location,description,order_operators(employee_name,start_time,end_time,work_hours)')
+        .lte('start_date', toDate)
+        .gte('end_date', fromDate)
+        .order('start_date'),
+      supabase
+        .from('order_operators')
+        .select('id,order_id,employee_name,work_date,start_time,end_time,work_hours,orders(order_number_display,order_line,mia_number,client_name,location)')
+        .gte('work_date', fromDate)
+        .lte('work_date', toDate)
+        .order('work_date')
+        .order('order_id'),
+      supabase
+        .from('equipment')
+        .select('id,mia_number,name,dedicated_type,bonus_percentage')
+        .not('mia_number','is',null),
+    ]);
+    if (ordRes.error) show('שגיאה בטעינת הזמנות','error');
+    else { setOrders(ordRes.data||[]); setLoaded(true); }
+    if (opsRes.error) show('שגיאה בטעינת שיבוץ','error');
+    else {
+      const map = {};
+      const mapUuid = {};
+      (eqRes.data||[]).forEach(e => {
+        if (e.mia_number) map[String(e.mia_number)] = e;
+        if (e.id) mapUuid[e.id] = e;
+      });
+      setEqByMia(map);
+      setEqByUuidR(mapUuid);
+      setOpRows(opsRes.data||[]);
+      setOpLoaded(true);
+    }
+    setLoading(false);
+    setOpLoading(false);
+  }
+
+  // Export to CSV
+  function exportCSV(rows, cols, filename) {
+    const header = cols.map(c=>c.label).join(',');
+    const lines = rows.map(r => cols.map(c => {
+      const v = String(c.value(r)||'').replace(/"/g,'""');
+      return `"${v}"`;
+    }).join(','));
+    const csv = '﻿' + [header,...lines].join('\n'); // BOM for Hebrew Excel
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  }
+
+  // ── TAB: GENERAL ──────────────────────────────────────────────────────────
+  function GeneralTab() {
+    const [openOrder, setOpenOrder] = React.useState(null);
+
+    // eqByUuidR: UUID->equipment (state from parent), eqByMia: mia->equipment
+    function eqLabelG(o) {
+      // 1. equipment_id is a real UUID — use eqByUuidR
+      if (o.equipment_id && eqByUuidR[o.equipment_id]) {
+        const e = eqByUuidR[o.equipment_id];
+        return `${e.name}${e.mia_number ? ' מי"ה ('+e.mia_number+')' : ''}`;
+      }
+      // 2. equipment_id is actually a mia_number (historical import)
+      if (o.equipment_id && eqByMia[String(o.equipment_id)]) {
+        const e = eqByMia[String(o.equipment_id)];
+        return `${e.name} מי"ה (${o.equipment_id})`;
+      }
+      // 3. mia_number field
+      if (o.mia_number && eqByMia[String(o.mia_number)]) {
+        const e = eqByMia[String(o.mia_number)];
+        return `${e.name} מי"ה (${o.mia_number})`;
+      }
+      if (o.mia_number) return `מי"ה ${o.mia_number}`;
+      if (o.is_external_equipment)
+        return [o.supplier_name, o.equipment_size].filter(Boolean).join(' - ') || o.equipment_type || 'חיצוני';
+      return '—';
+    }
+
+    // Sum work_hours from operators for each order
+    function totalHours(o) {
+      const ops = o.order_operators||[];
+      if (!ops.length) return '—';
+      const sum = ops.reduce((acc, op) => acc + (parseFloat(op.work_hours)||0), 0);
+      return sum > 0 ? sum.toFixed(1) : '—';
+    }
+
+    const STATUS_HE_G = { pending:'ממתין', approved:'אושר', active:'בביצוע', completed:'הושלם', cancelled:'בוטל' };
+
+    // Format time HH:MM from "HH:MM:SS" or "HH:MM"
+    const fmtTime = t => t ? t.slice(0,5) : '—';
+
+    const cols = [
+      { label:'פק"ע',          value: o => o.order_number_display||'' },
+      { label:'כלי',           value: o => eqLabelG(o) },
+      { label:'מזמין',         value: o => o.client_name||'' },
+      { label:'מפעילים',       value: o => [...new Set((o.order_operators||[]).map(x=>x.employee_name))].join(', ') },
+      { label:'שעות',          value: o => totalHours(o) },
+      { label:'שעת התחלה',     value: o => fmtTime(o.start_time) },
+      { label:'שעת סיום',      value: o => fmtTime(o.end_time) },
+      { label:'מיקום',         value: o => o.location||'' },
+      { label:'תאריך',         value: o => dispDate(o.start_date) },
+      { label:'סטטוס',         value: o => STATUS_HE_G[o.status]||o.status||'' },
+    ];
+
+    const total = orders.length;
+
+    return (
+      <div>
+        {openOrder && <OrderModal item={openOrder} onClose={()=>setOpenOrder(null)} onSave={()=>{setOpenOrder(null);load();}} equipment={Object.values(eqByUuidR)} employees={[]} />}
+
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <span style={{fontWeight:700,fontSize:15}}>📄 דוח כללי הזמנות ({total})</span>
+          <button className="btn btn-outline btn-sm"
+            onClick={()=>exportCSV(orders, cols, `דוח_כללי_${fromDate}_${toDate}.csv`)}>
+            ⬆ ייצא CSV
+          </button>
+        </div>
+
+        {total === 0 ? (
+          <div style={{textAlign:'center',color:'#a8a29e',padding:'40px 0',fontSize:14}}>אין הזמנות בטווח שנבחר</div>
+        ) : (
+          <div style={{overflowX:'auto',maxHeight:'65vh',overflowY:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+              <thead>
+                <tr style={{background:'#1c1917',color:'white',position:'sticky',top:0,zIndex:1}}>
+                  {['פק"ע','כלי','מזמין','מפעילים','שעות','שעת התחלה','שעת סיום','מיקום','תאריך','סטטוס',''].map(h=>(
+                    <th key={h} style={{padding:'10px 10px',textAlign:'right',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((o,i) => {
+                  const equipLabel = eqLabelG(o);
+                  const ops = [...new Set((o.order_operators||[]).map(x=>x.employee_name))].join(', ');
+                  const hrs = totalHours(o);
+                  const statusHe = STATUS_HE_G[o.status]||o.status||'—';
+                  const sc = statusBadge(o.status);
+                  return (
+                    <tr key={o.id} style={{background:i%2===0?'white':'#fafaf9',borderBottom:'1px solid #e7e5e4'}}>
+                      <td style={{padding:'9px 10px',color:'var(--primary)',fontWeight:700,whiteSpace:'nowrap'}}>{o.order_number_display||'—'}</td>
+                      <td style={{padding:'9px 10px',fontSize:12,maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{equipLabel}</td>
+                      <td style={{padding:'9px 10px',whiteSpace:'nowrap'}}>{o.client_name||'—'}</td>
+                      <td style={{padding:'9px 10px',fontSize:12,maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ops||'—'}</td>
+                      <td style={{padding:'9px 10px',color:'#15803d',fontWeight:600,textAlign:'center'}}>{hrs}</td>
+                      <td style={{padding:'9px 10px',textAlign:'center',whiteSpace:'nowrap'}}>{fmtTime(o.start_time)}</td>
+                      <td style={{padding:'9px 10px',textAlign:'center',whiteSpace:'nowrap'}}>{fmtTime(o.end_time)}</td>
+                      <td style={{padding:'9px 10px',maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.location||'—'}</td>
+                      <td style={{padding:'9px 10px',whiteSpace:'nowrap'}}>{dispDate(o.start_date)}</td>
+                      <td style={{padding:'9px 10px'}}>
+                        <span style={{background:sc.bg,color:sc.text,padding:'2px 8px',borderRadius:4,fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>{statusHe}</span>
+                      </td>
+                      <td style={{padding:'9px 6px',textAlign:'center'}}>
+                        <button className="btn btn-outline btn-sm"
+                          style={{padding:'3px 8px',fontSize:11,whiteSpace:'nowrap'}}
+                          onClick={()=>setOpenOrder(o)}>
+                          📋 פתח
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── TAB: OPERATOR SCHEDULE ────────────────────────────────────────────────
+  const [opRows, setOpRows]       = useState([]);
+  const [eqByMia, setEqByMia]     = useState({}); // mia_number -> equipment row
+  const [opLoading, setOpLoading] = useState(false);
+  const [opLoaded, setOpLoaded]   = useState(false);
+  const [filterMia, setFilterMia] = useState('');
+  const [filterOp, setFilterOp]   = useState('');
+
+  async function loadOps() {
+    if (!fromDate || !toDate) { show('בחר תאריכים','error'); return; }
+    setOpLoading(true);
+    const [opsRes, eqRes] = await Promise.all([
+      supabase
+        .from('order_operators')
+        .select('id,order_id,employee_name,work_date,start_time,end_time,work_hours,orders(order_number_display,order_line,mia_number,client_name,location)')
+        .gte('work_date', fromDate)
+        .lte('work_date', toDate)
+        .order('work_date')
+        .order('order_id'),
+      supabase
+        .from('equipment')
+        .select('id,mia_number,name,dedicated_type,bonus_percentage')
+        .not('mia_number','is',null),
+    ]);
+    if (opsRes.error) { show('שגיאה בטעינה: '+opsRes.error.message,'error'); setOpLoading(false); return; }
+    // Build mia_number -> equipment map
+    const map = {};
+    (eqRes.data||[]).forEach(e => { if(e.mia_number) map[String(e.mia_number)] = e; });
+    setEqByMia(map);
+    setOpRows(opsRes.data||[]);
+    setOpLoaded(true);
+    setOpLoading(false);
+  }
+
+  // Calculate hours with overnight support
+  function calcHours(start, end) {
+    if (!start || !end) return null;
+    const toMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+    let diff = toMin(end) - toMin(start);
+    if (diff < 0) diff += 1440; // overnight shift
+    return (diff/60).toFixed(2);
+  }
+
+  function OpsSchedTab() {
+    const q1 = filterMia.trim().toLowerCase();
+    const q2 = filterOp.trim().toLowerCase();
+    const filtered = opRows.filter(r => {
+      const mia = (r.orders?.mia_number||'').toLowerCase();
+      const op  = (r.employee_name||'').toLowerCase();
+      return (!q1 || mia.includes(q1)) && (!q2 || op.includes(q2));
+    });
+
+    const cols = [
+      { label:'תאריך',           value: r => r.work_date ? r.work_date.replace(/-/g,'/') : '' },
+      { label:'פק"ע',            value: r => r.orders?.order_number_display||'' },
+      { label:'מיקום',           value: r => r.orders?.location||'' },
+      { label:'שעות',            value: r => { const h=calcHours(r.start_time,r.end_time); return h||''; } },
+      { label:'שעת סיום',        value: r => r.end_time   ? r.end_time.slice(0,5)   : '' },
+      { label:'שעת התחלה',       value: r => r.start_time ? r.start_time.slice(0,5) : '' },
+      { label:'אחוזי פרמיה',     value: r => { const e=eqByMia[String(r.orders?.mia_number||'')]; return e?.bonus_percentage||''; } },
+      { label:'סוג',             value: r => { const e=eqByMia[String(r.orders?.mia_number||'')]; return e?.dedicated_type||''; } },
+      { label:'מי"ה',            value: r => r.orders?.mia_number||'' },
+      { label:'כלי',             value: r => { const e=eqByMia[String(r.orders?.mia_number||'')]; return e?.name||''; } },
+      { label:'מפעיל',           value: r => r.employee_name||'' },
+    ];
+
+    return (
+      <div>
+        {/* Header */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}>
+          <span style={{fontWeight:700,fontSize:15}}>👷 דוח שיבוץ מפעילים ({filtered.length} רשומות)</span>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            <input placeholder="סינון מי&quot;ה..." value={filterMia} onChange={e=>setFilterMia(e.target.value)}
+              style={{border:'1px solid var(--border)',borderRadius:8,padding:'5px 10px',fontSize:13,width:120}} />
+            <input placeholder="סינון מפעיל..." value={filterOp} onChange={e=>setFilterOp(e.target.value)}
+              style={{border:'1px solid var(--border)',borderRadius:8,padding:'5px 10px',fontSize:13,width:140}} />
+            {opLoaded && (
+              <button className="btn btn-outline btn-sm" onClick={()=>exportCSV(filtered,cols,`שיבוץ_מפעילים_${fromDate}_${toDate}.csv`)}>
+                ⬇ ייצא CSV
+              </button>
+            )}
+          </div>
+        </div>
+
+        {!opLoaded ? (
+          <div style={{textAlign:'center',color:'#a8a29e',padding:'40px 0',fontSize:14}}>לחץ "טען" לטעינת הנתונים</div>
+        ) : filtered.length === 0 ? (
+          <div style={{textAlign:'center',color:'#a8a29e',padding:'40px 0',fontSize:14}}>אין רשומות בטווח שנבחר</div>
+        ) : (
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+              <thead>
+                <tr style={{background:'#1c1917',color:'white'}}>
+                  {['תאריך','פק"ע','מיקום','שעות','שעת סיום','שעת התחלה','אחוזי פרמיה','סוג','מי"ה','כלי','מפעיל'].map(h=>(
+                    <th key={h} style={{padding:'10px 10px',textAlign:'right',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r,i) => {
+                  const hrs = calcHours(r.start_time, r.end_time);
+                  const overnight = r.start_time && r.end_time && r.end_time.slice(0,5) < r.start_time.slice(0,5);
+                  const eq = eqByMia[String(r.orders?.mia_number||'')] || {};
+                  return (
+                    <tr key={r.id} style={{background:i%2===0?'white':'#fafaf9',borderBottom:'1px solid #e7e5e4'}}>
+                      <td style={{padding:'8px 10px',whiteSpace:'nowrap',fontWeight:600}}>{r.work_date?r.work_date.replace(/-/g,'/'):'—'}</td>
+                      <td style={{padding:'8px 10px',color:'var(--primary)',fontWeight:700}}>{r.orders?.order_number_display||'—'}</td>
+                      <td style={{padding:'8px 10px',fontSize:12}}>{r.orders?.location||'—'}</td>
+                      <td style={{padding:'8px 10px',color:'#15803d',fontWeight:700}}>{hrs||'—'}</td>
+                      <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>
+                        {r.end_time?r.end_time.slice(0,5):'—'}
+                        {overnight && <span title="משמרת לילה" style={{marginRight:4,fontSize:11}}>🌙</span>}
+                      </td>
+                      <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>{r.start_time?r.start_time.slice(0,5):'—'}</td>
+                      <td style={{padding:'8px 10px',textAlign:'center'}}>{eq.bonus_percentage||'—'}</td>
+                      <td style={{padding:'8px 10px',fontSize:12,color:'#0369a1'}}>{eq.dedicated_type||'—'}</td>
+                      <td style={{padding:'8px 10px',fontWeight:600}}>{r.orders?.mia_number||'—'}</td>
+                      <td style={{padding:'8px 10px',fontSize:12}}>{eq.name||'—'}</td>
+                      <td style={{padding:'8px 10px'}}>{r.employee_name||'—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── PLACEHOLDER for future tabs ────────────────────────────────────────────
+  function ComingSoon({ label }) {
+    return (
+      <div style={{textAlign:'center',padding:'60px 0',color:'#a8a29e'}}>
+        <div style={{fontSize:40,marginBottom:12}}>🔧</div>
+        <div style={{fontSize:15,fontWeight:600,color:'#78716c'}}>{label}</div>
+        <div style={{fontSize:13,marginTop:6}}>בקרוב...</div>
+      </div>
+    );
+  }
+
+  const tabContent = {
+    general:     <GeneralTab />,
+    equip_avail: <ComingSoon label="זמינות כלים" />,
+    equip_sched: <ComingSoon label="שיבוץ כלים" />,
+    ops_sched:   <OpsSchedTab />,
+    util_pct:    <ComingSoon label="% ניצול כלים" />,
+    locations:   <ComingSoon label="מסריצת מיקומים" />,
+  };
+
+  return (
+    <div>
+      {toast}
+      <div className="page-header">
+        <div>
+          <h2>📊 דוחות</h2>
+          <p style={{color:'var(--text-muted)',fontSize:13}}>בחר טווח תאריכים וייצא את הדוח הרצוי</p>
+        </div>
+      </div>
+
+      {/* Date range picker */}
+      <div style={{background:'white',borderRadius:14,border:'1px solid var(--border)',padding:'16px 20px',marginBottom:16,display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <label style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>מתאריך</label>
+          <input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)}
+            style={{border:'1px solid var(--border)',borderRadius:8,padding:'6px 10px',fontSize:13}} />
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <label style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap'}}>עד תאריך</label>
+          <input type="date" value={toDate} onChange={e=>setToDate(e.target.value)}
+            style={{border:'1px solid var(--border)',borderRadius:8,padding:'6px 10px',fontSize:13}} />
+        </div>
+        <button className="btn btn-primary" onClick={load} disabled={loading}
+          style={{display:'flex',alignItems:'center',gap:6}}>
+          {loading ? '⏳ טוען...' : '🔄 רענן'}
+        </button>
+        {loaded && (
+          <span style={{fontSize:13,color:'#15803d',fontWeight:600}}>✓ {orders.length} הזמנות בטווח</span>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div style={{background:'white',borderRadius:14,border:'1px solid var(--border)',overflow:'hidden'}}>
+        {/* Tab bar */}
+        <div style={{display:'flex',borderBottom:'1px solid var(--border)',overflowX:'auto'}}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{
+              display:'flex',alignItems:'center',gap:6,
+              padding:'12px 16px',border:'none',cursor:'pointer',
+              background: activeTab===t.id ? 'white' : '#fafaf9',
+              color: activeTab===t.id ? 'var(--primary)' : '#78716c',
+              fontWeight: activeTab===t.id ? 700 : 400,
+              fontSize:13,whiteSpace:'nowrap',
+              borderBottom: activeTab===t.id ? '2px solid var(--primary)' : '2px solid transparent',
+              transition:'all 0.15s',
+            }}>
+              <span>{t.icon}</span>{t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div style={{padding:20}}>
+          {!loaded ? (
+            <div style={{textAlign:'center',color:'#a8a29e',padding:'40px 0',fontSize:14}}>
+              בחר טווח תאריכים ולחץ רענן להצגת נתונים
+            </div>
+          ) : tabContent[activeTab]}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPage() {
+  const { toast, show } = useToast();
+
+  // Each list is {name, label, rows}
+  const LIST_DEFS = [
+    { name: 'license_types',            label: 'סוגי רישיון מפעיל' },
+    { name: 'equipment_types',          label: 'סוגי כלי צמ"ה' },
+    { name: 'equipment_status_options', label: 'סטטוס כלי (זמינות)' },
+    { name: 'attendance_status',        label: 'סטטוס נוכחות עובד (זמינות)' },
+    { name: 'order_status',             label: 'סטטוס הזמנה' },
+  ];
+
+  const [rows, setRows] = useState({});        // { list_name: [{id, value, sort_order}] }
+  const [loading, setLoading] = useState(true);
+  const [newVal, setNewVal] = useState({});    // { list_name: '' }
+
+  // Load all lookup rows
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('lookup_lists').select('*').order('list_name').order('sort_order');
+    if (!error) {
+      const grouped = {};
+      LIST_DEFS.forEach(d => { grouped[d.name] = []; });
+      (data||[]).forEach(r => {
+        if (grouped[r.list_name]) grouped[r.list_name].push(r);
+      });
+      setRows(grouped);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Add a new value to a list
+  async function handleAdd(listName) {
+    const val = (newVal[listName]||'').trim();
+    if (!val) return;
+    const maxOrder = (rows[listName]||[]).reduce((m,r)=>Math.max(m,r.sort_order||0),0);
+    const { data, error } = await supabase.from('lookup_lists')
+      .insert({ list_name: listName, value: val, sort_order: maxOrder+10 })
+      .select().single();
+    if (error) { console.error('lookup insert error:', error); show('שגיאה בהוספה: ' + error.message,'error'); return; }
+    setRows(prev => ({ ...prev, [listName]: [...(prev[listName]||[]), data] }));
+    setNewVal(prev => ({ ...prev, [listName]: '' }));
+    show(`"${val}" נוסף`);
+  }
+
+  // Delete a value from a list
+  async function handleDelete(listName, row) {
+    const { error } = await supabase.from('lookup_lists').delete().eq('id', row.id);
+    if (error) { show('שגיאה במחיקה','error'); return; }
+    setRows(prev => ({ ...prev, [listName]: prev[listName].filter(r=>r.id!==row.id) }));
+    show(`"${row.value}" נמחק`);
+  }
+
+  // ── Renumber all orders once ──────────────────────────────────────────────
+  const [renumState, setRenumState] = useState('idle'); // idle | running | done | error
+
+  async function renumberOrders() {
+    if (!window.confirm('פעולה זו תמספר מחדש את כל ההזמנות לפי תאריך (2026-001, 2026-002...). להמשיך?')) return;
+    setRenumState('running');
+
+    // Fetch all orders sorted by date, then mia_number as tiebreaker
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, start_date, mia_number')
+      .order('start_date', { ascending: true })
+      .order('mia_number', { ascending: true, nullsFirst: false });
+
+    if (error) { show('שגיאה בשליפה: ' + error.message, 'error'); setRenumState('error'); return; }
+
+    let fail = 0;
+    // Update in batches of 50 to avoid timeout
+    for (let i = 0; i < data.length; i++) {
+      const num = `2026-${String(i + 1).padStart(3, '0')}`;
+      const { error: upErr } = await supabase
+        .from('orders')
+        .update({ order_number_display: num })
+        .eq('id', data[i].id);
+      if (upErr) fail++;
+    }
+
+    if (fail === 0) {
+      show(`✅ ${data.length} הזמנות מוספרו בהצלחה (2026-001 עד 2026-${String(data.length).padStart(3,'0')})`, 'success');
+      setRenumState('done');
+    } else {
+      show(`⚠️ הושלם עם ${fail} שגיאות`, 'error');
+      setRenumState('error');
+    }
+  }
+
+  return (
+    <div>
+      <Toast toast={toast}/>
+      <div className="page-header">
+        <div><h2>הגדרות</h2><p>ניהול רשימות עזר ופרמטרים</p></div>
+      </div>
+
+      {/* ── One-time order renumbering ── */}
+      <div className="table-card" style={{marginBottom:24,padding:20}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+          <div>
+            <h3 style={{marginBottom:4}}>🔢 מספור הזמנות</h3>
+            <p style={{fontSize:13,color:'var(--text-muted)'}}>
+              ממספר מחדש את כל ההזמנות לפי תאריך: 2026-001 (ראשונה) עד 2026-NNN (אחרונה).<br/>
+              הזמנות חדשות יקבלו אוטומטית את המספר הבא. יש להריץ פעם אחת בלבד.
+            </p>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={renumberOrders}
+            disabled={renumState === 'running' || renumState === 'done'}
+            style={{minWidth:160,whiteSpace:'nowrap'}}>
+            {renumState === 'running' ? '⏳ מספר...' :
+             renumState === 'done'    ? '✅ הושלם' :
+             '🔢 מספר הזמנות מחדש'}
+          </button>
+        </div>
+      </div>
+
+      {loading && <p style={{color:'var(--text-muted)'}}>טוען...</p>}
+
+      {LIST_DEFS.map(def => (
+        <div key={def.name} className="table-card" style={{marginBottom:24}}>
+          <div className="table-header">
+            <h3>{def.label}</h3>
+            <span style={{fontSize:12,color:'var(--text-muted)'}}>{(rows[def.name]||[]).length} ערכים</span>
+          </div>
+          <div style={{padding:'16px'}}>
+            {/* Current values */}
+            <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}>
+              {(rows[def.name]||[]).length === 0 && (
+                <span style={{color:'var(--text-muted)',fontSize:13}}>אין ערכים עדיין</span>
+              )}
+              {(rows[def.name]||[]).map(r => (
+                <div key={r.id} style={{
+                  display:'inline-flex', alignItems:'center', gap:6,
+                  background:'var(--primary-light)', borderRadius:20,
+                  padding:'4px 12px', fontSize:14, fontWeight:500
+                }}>
+                  <span>{r.value}</span>
+                  <button
+                    onClick={()=>handleDelete(def.name,r)}
+                    style={{background:'none',border:'none',cursor:'pointer',
+                            color:'var(--danger)',fontSize:16,lineHeight:1,padding:0}}
+                    title="מחק"
+                  >×</button>
+                </div>
+              ))}
+            </div>
+            {/* Add new value */}
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <input
+                type="text"
+                value={newVal[def.name]||''}
+                onChange={e=>setNewVal(p=>({...p,[def.name]:e.target.value}))}
+                onKeyDown={e=>e.key==='Enter'&&handleAdd(def.name)}
+                placeholder="ערך חדש..."
+                style={{flex:1,padding:'8px 12px',border:'1px solid var(--border)',
+                        borderRadius:8,fontSize:14,fontFamily:'inherit',direction:'rtl'}}
+              />
+              <button className="btn btn-primary" onClick={()=>handleAdd(def.name)}>
+                + הוסף
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SIDEBAR + ROUTER
+// ══════════════════════════════════════════════════════════════════════════════
+const PAGES = [
+  { id:'home',        label:'דף הבית',    icon:'🏠' },
+  { id:'equipment',   label:'כלים וציוד', icon:'🏗️' },
+  { id:'employees',   label:'עובדים',     icon:'👷' },
+  { id:'orders',      label:'הזמנות',     icon:'📋' },
+  { id:'calendar',    label:'לוח שנה',    icon:'📆' },
+  { id:'schedule',    label:'לוח שיבוץ',  icon:'👷' },
+  { id:'tasks',       label:'משימות',     icon:'✅' },
+  { id:'availability',label:'זמינות',     icon:'📅' },
+  { id:'reports',     label:'דוחות',      icon:'📊' },
+  { id:'settings',    label:'הגדרות',     icon:'⚙️' },
+];
+
+function App() {
+  const [page, setPage] = useState('home');
+
+  const content = {
+    home:         <HomePage navigate={setPage} />,
+    equipment:    <EquipmentPage />,
+    employees:    <EmployeesPage />,
+    orders:       <OrdersPage />,
+    calendar:     <CalendarPage />,
+    schedule:     <SchedulePage />,
+    tasks:        <TasksPage />,
+    availability: <AvailabilityPage />,
+    reports:      <ReportsPage />,
+    settings:     <SettingsPage />,
+  }[page] || <HomePage navigate={setPage} />;
+
+  return (
+    <>
+      {/* Sidebar */}
+      <nav id="sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-icon">🏗️</div>
+          <div className="logo-text">
+            <h1>ניהול צי</h1>
+            <p>מנופים וצמ"ה</p>
+          </div>
+        </div>
+        <ul className="nav-list">
+          {PAGES.map(p => (
+            <li key={p.id} className={`nav-item${page===p.id?' active':''}`} onClick={()=>setPage(p.id)}>
+              <span className="icon">{p.icon}</span>
+              {p.label}
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* Main content */}
+      <main id="main">{content}</main>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
